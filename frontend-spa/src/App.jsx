@@ -1090,9 +1090,27 @@ const GamePreviewPage = () => {
                 (g.HomeTeam === homeAbbr && g.AwayTeam === awayAbbr.replace('WSH','WAS'))
               );
               if (sdGame) {
+                const isMLB = league === 'mlb';
+                const rawOU = sdGame.OverUnder;
+                // Sanity-check O/U per sport (NBA totals are 200+, MLB 7-15, NFL 35-65)
+                const ouSane = rawOU != null && (
+                  (league === 'nba' && rawOU > 150) ||
+                  (isMLB && rawOU >= 5 && rawOU <= 20) ||
+                  (league === 'nfl' && rawOU >= 30 && rawOU <= 80) ||
+                  (!['nba','mlb','nfl'].includes(league))
+                );
+                // MLB: run line is always -1.5 / +1.5; determine who's the fave by ML
+                const awayIsFave = isMLB && (sdGame.AwayTeamMoneyLine != null) && sdGame.AwayTeamMoneyLine < 0;
                 setOdds({
-                  spread:       sdGame.PointSpread != null ? sdGame.PointSpread : null,
-                  total:        sdGame.OverUnder   != null ? sdGame.OverUnder   : null,
+                  isMLB,
+                  // MLB: don't show PointSpread — show run line instead
+                  spread:       isMLB ? null : sdGame.PointSpread,
+                  // MLB run line: away team gets -1.5 if fave, +1.5 if dog
+                  runLineAway:  isMLB ? (awayIsFave ? -1.5 : 1.5) : null,
+                  runLineHome:  isMLB ? (awayIsFave ? 1.5 : -1.5) : null,
+                  runLineAwayOdds: isMLB ? sdGame.PointSpreadAwayTeamMoneyLine : null,
+                  runLineHomeOdds: isMLB ? sdGame.PointSpreadHomeTeamMoneyLine : null,
+                  total:        ouSane ? rawOU : null,
                   homeML:       sdGame.HomeTeamMoneyLine,
                   awayML:       sdGame.AwayTeamMoneyLine,
                   channel:      sdGame.Channel || null,
@@ -1201,17 +1219,28 @@ const GamePreviewPage = () => {
 
           {/* Live odds strip under scoreboard */}
           {odds && (
-            <div className="mt-6 flex items-center justify-center gap-8 text-center border-t border-[#2a2a2a] pt-5">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-center border-t border-[#2a2a2a] pt-5">
+              {/* Spread / Run Line */}
               <div>
-                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">Spread</div>
+                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">
+                  {odds.isMLB ? 'Run Line' : 'Spread'}
+                </div>
                 <div className="text-[#f0ebe0] font-bold text-sm">
-                  {odds.spread != null ? `${game.home.abbr} ${odds.spread > 0 ? '+' : ''}${odds.spread}` : '—'}
+                  {odds.isMLB
+                    ? `${game.away.abbr} ${fmtML(odds.runLineAway)} / ${game.home.abbr} ${fmtML(odds.runLineHome)}`
+                    : odds.spread != null
+                      ? `${game.home.abbr} ${odds.spread <= 0 ? odds.spread : `+${odds.spread}`}`
+                      : '—'
+                  }
                 </div>
               </div>
-              <div>
-                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">O/U</div>
-                <div className="text-[#f0ebe0] font-bold text-sm">{odds.total != null ? odds.total : '—'}</div>
-              </div>
+              {/* O/U — only show if passed sanity check */}
+              {odds.total != null && (
+                <div>
+                  <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">O/U</div>
+                  <div className="text-[#f0ebe0] font-bold text-sm">{odds.total}</div>
+                </div>
+              )}
               <div>
                 <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">{game.away.abbr} ML</div>
                 <div className="text-[#f0ebe0] font-bold text-sm">{fmtML(odds.awayML)}</div>
@@ -1281,10 +1310,24 @@ const GamePreviewPage = () => {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  ['Spread', odds.spread != null ? `${game.home.abbr} ${odds.spread > 0 ? '+' : ''}${odds.spread}` : '—'],
-                  ['Over/Under', odds.total != null ? `${odds.total}` : '—'],
+                  // Spread/Run Line
+                  odds.isMLB
+                    ? [null, null]  // handled separately below
+                    : ['Spread', odds.spread != null ? `${game.home.abbr} ${odds.spread <= 0 ? odds.spread : `+${odds.spread}`}` : '—'],
+                  // O/U — only if sane
+                  ['O/U', odds.total != null ? String(odds.total) : '—'],
                   [`${game.away.abbr} ML`, fmtML(odds.awayML)],
                   [`${game.home.abbr} ML`, fmtML(odds.homeML)],
+                ].filter(([l]) => l != null).map(([label, val]) => (
+                  <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-3 text-center">
+                    <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">{label}</div>
+                    <div className="text-[#f0ebe0] font-black text-base">{val}</div>
+                  </div>
+                ))}
+                {/* MLB Run Line — two separate cells */}
+                {odds.isMLB && [
+                  [`${game.away.abbr} RL`, `${fmtML(odds.runLineAway)} (${fmtML(odds.runLineAwayOdds)})`],
+                  [`${game.home.abbr} RL`, `${fmtML(odds.runLineHome)} (${fmtML(odds.runLineHomeOdds)})`],
                 ].map(([label, val]) => (
                   <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-3 text-center">
                     <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">{label}</div>
@@ -1321,34 +1364,63 @@ const GamePreviewPage = () => {
                   <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Current Lines</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Spread card */}
+                  {/* Spread / Run Line card */}
                   <div className="bg-[#2a2a2a]/50 rounded-xl p-4">
-                    <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-3">Point Spread</div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <img src={game.away.logo} alt={game.away.abbr} className="w-6 h-6 object-contain" onError={e=>{e.target.style.display='none'}} />
-                        <span className="text-[#888] text-sm font-bold">{game.away.abbr}</span>
-                      </div>
-                      <span className="text-[#f0ebe0] font-black text-lg">
-                        {odds.spread != null ? (odds.spread > 0 ? `+${odds.spread}` : odds.spread === 0 ? 'PK' : `+${Math.abs(odds.spread)}`) : '—'}
-                      </span>
+                    <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-3">
+                      {odds.isMLB ? 'Run Line' : 'Point Spread'}
                     </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-2">
-                        <img src={game.home.logo} alt={game.home.abbr} className="w-6 h-6 object-contain" onError={e=>{e.target.style.display='none'}} />
-                        <span className="text-[#888] text-sm font-bold">{game.home.abbr}</span>
-                      </div>
-                      <span className="text-[#f0ebe0] font-black text-lg">
-                        {odds.spread != null ? (odds.spread > 0 ? `-${odds.spread}` : odds.spread === 0 ? 'PK' : `${odds.spread}`) : '—'}
-                      </span>
-                    </div>
+                    {odds.isMLB ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <img src={game.away.logo} alt={game.away.abbr} className="w-6 h-6 object-contain" onError={e=>{e.target.style.display='none'}} />
+                            <span className="text-[#888] text-sm font-bold">{game.away.abbr}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[#f0ebe0] font-black text-lg">{fmtML(odds.runLineAway)}</span>
+                            <span className="text-[#555] text-xs ml-1">({fmtML(odds.runLineAwayOdds)})</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center gap-2">
+                            <img src={game.home.logo} alt={game.home.abbr} className="w-6 h-6 object-contain" onError={e=>{e.target.style.display='none'}} />
+                            <span className="text-[#888] text-sm font-bold">{game.home.abbr}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[#f0ebe0] font-black text-lg">{fmtML(odds.runLineHome)}</span>
+                            <span className="text-[#555] text-xs ml-1">({fmtML(odds.runLineHomeOdds)})</span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <img src={game.away.logo} alt={game.away.abbr} className="w-6 h-6 object-contain" onError={e=>{e.target.style.display='none'}} />
+                            <span className="text-[#888] text-sm font-bold">{game.away.abbr}</span>
+                          </div>
+                          <span className="text-[#f0ebe0] font-black text-lg">
+                            {odds.spread != null ? (odds.spread < 0 ? `+${Math.abs(odds.spread)}` : odds.spread === 0 ? 'PK' : `-${odds.spread}`) : '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center gap-2">
+                            <img src={game.home.logo} alt={game.home.abbr} className="w-6 h-6 object-contain" onError={e=>{e.target.style.display='none'}} />
+                            <span className="text-[#888] text-sm font-bold">{game.home.abbr}</span>
+                          </div>
+                          <span className="text-[#f0ebe0] font-black text-lg">
+                            {odds.spread != null ? (odds.spread < 0 ? `${odds.spread}` : odds.spread === 0 ? 'PK' : `+${odds.spread}`) : '—'}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   {/* Total card */}
                   <div className="bg-[#2a2a2a]/50 rounded-xl p-4">
                     <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-3">Total (O/U)</div>
                     <div className="text-center">
                       <div className="text-[#f0ebe0] font-black text-3xl mb-1">{odds.total ?? '—'}</div>
-                      <div className="text-[#555] text-xs">Over / Under</div>
+                      <div className="text-[#555] text-xs">{odds.total != null ? 'Over / Under' : 'Not available'}</div>
                     </div>
                   </div>
                   {/* Moneyline card */}
