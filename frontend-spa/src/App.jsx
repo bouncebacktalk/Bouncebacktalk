@@ -1075,15 +1075,63 @@ const GamePreviewPage = () => {
 
   const [game, setGame]         = useState(null);
   const [odds, setOdds]         = useState(null);
+  const [pbp, setPbp]           = useState([]);
+  const [pbpLoading, setPbpLoading] = useState(false);
   const [homeRoster, setHomeRoster] = useState([]);
   const [awayRoster, setAwayRoster] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState('preview');
+  const pbpInterval = useRef(null);
+
+  // ESPN summary — fetches odds (pickcenter) + play-by-play for a given ESPN event ID
+  const fetchSummary = async (espnEventId, isLive) => {
+    try {
+      const url = `https://site.api.espn.com/apis/site/v2/sports/${leagueObj.sport}/${league}/summary?event=${espnEventId}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      // ── Odds from pickcenter (clean, no name matching needed) ──
+      const pc = data.pickcenter?.[0];
+      if (pc) {
+        const isMLB = league === 'mlb';
+        const homeSpread = pc.spread ?? null;           // e.g. -1.5 = home favored
+        const awaySpread = homeSpread != null ? -homeSpread : null;
+        setOdds({
+          isMLB,
+          bookmaker:       pc.provider?.name || 'DraftKings',
+          homeML:          pc.homeTeamOdds?.moneyLine ?? null,
+          awayML:          pc.awayTeamOdds?.moneyLine ?? null,
+          homeSpreadPoint: homeSpread,
+          awaySpreadPoint: awaySpread,
+          homeSpreadOdds:  pc.homeTeamOdds?.spreadOdds ?? null,
+          awaySpreadOdds:  pc.awayTeamOdds?.spreadOdds ?? null,
+          total:           pc.overUnder ?? null,
+          overOdds:        pc.overOdds ?? null,
+          underOdds:       pc.underOdds ?? null,
+          details:         pc.details || null,
+        });
+      }
+
+      // ── Play-by-play ──
+      const plays = data.plays;
+      if (Array.isArray(plays) && plays.length) {
+        // Reverse so newest is first, group by period
+        const reversed = [...plays].reverse();
+        setPbp(reversed);
+      }
+
+      // Live polling — refresh every 30s while in progress
+      if (isLive && !pbpInterval.current) {
+        pbpInterval.current = setInterval(() => fetchSummary(espnEventId, true), 30000);
+      }
+    } catch { /* summary unavailable */ }
+    setPbpLoading(false);
+  };
 
   useEffect(() => {
     if (!leagueObj) { setLoading(false); return; }
 
-    // 1. ESPN scoreboard — find this specific game by ID
+    // 1. ESPN scoreboard — find this game by ID
     fetch(espnUrl(leagueObj.sport, league))
       .then(r => r.json())
       .then(async data => {
@@ -1092,16 +1140,17 @@ const GamePreviewPage = () => {
 
         const comp = ev.competitions?.[0];
         const homeEspn = comp?.competitors?.find(c => c.homeAway === 'home');
-        const awayEspn  = comp?.competitors?.find(c => c.homeAway === 'away');
+        const awayEspn = comp?.competitors?.find(c => c.homeAway === 'away');
         const homeAbbr = homeEspn?.team?.abbreviation || '';
-        const awayAbbr  = awayEspn?.team?.abbreviation  || '';
+        const awayAbbr = awayEspn?.team?.abbreviation || '';
+        const isLive   = comp?.status?.type?.state === 'in';
 
         const gameObj = {
           id: ev.id,
           league: leagueObj.label,
           venue: comp?.venue?.fullName || 'TBD',
-          city: comp?.venue?.address?.city || '',
-          date: ev.date,
+          city:  comp?.venue?.address?.city || '',
+          date:  ev.date,
           home: {
             name:   homeEspn?.team?.displayName || homeAbbr,
             abbr:   homeAbbr,
@@ -1110,42 +1159,23 @@ const GamePreviewPage = () => {
             record: homeEspn?.records?.[0]?.summary || '',
           },
           away: {
-            name:   awayEspn?.team?.displayName  || awayAbbr,
+            name:   awayEspn?.team?.displayName || awayAbbr,
             abbr:   awayAbbr,
-            logo:   awayEspn?.team?.logo  || espnLogo(league, awayAbbr),
-            score:  awayEspn?.score  || '0',
+            logo:   awayEspn?.team?.logo || espnLogo(league, awayAbbr),
+            score:  awayEspn?.score || '0',
             record: awayEspn?.records?.[0]?.summary || '',
           },
-          isLive:    comp?.status?.type?.state === 'in',
-          isFinal:   comp?.status?.type?.completed === true,
+          isLive,
+          isFinal:    comp?.status?.type?.completed === true,
           statusText: comp?.status?.type?.shortDetail || '',
+          sport:      leagueObj.sport,
         };
         setGame(gameObj);
         setLoading(false);
 
-        // 2. SportsData.io — odds from today's game list (NHL skipped)
-        if (league !== 'nhl') {
-          try {
-            const isMLB = league === 'mlb';
-            const oddsGames = await fetchOddsForSport(league);
-            if (Array.isArray(oddsGames) && oddsGames.length) {
-              // Match by full team name — ESPN displayName vs Odds API home_team/away_team
-              const homeName = gameObj.home.name.toLowerCase();
-              const awayName = gameObj.away.name.toLowerCase();
-              const match = oddsGames.find(g =>
-                g.home_team.toLowerCase().includes(homeName.split(' ').pop()) &&
-                g.away_team.toLowerCase().includes(awayName.split(' ').pop())
-              ) || oddsGames.find(g =>
-                homeName.includes(g.home_team.toLowerCase().split(' ').pop()) &&
-                awayName.includes(g.away_team.toLowerCase().split(' ').pop())
-              );
-              if (match) {
-                const parsed = parseOddsGame(match, isMLB);
-                if (parsed) setOdds(parsed);
-              }
-            }
-          } catch { /* odds unavailable */ }
-        }
+        // 2. ESPN summary — odds + play-by-play (single call, works for all sports)
+        setPbpLoading(true);
+        fetchSummary(ev.id, isLive);
 
         // 3. Rosters — lazy load both teams in parallel
         if (league !== 'nhl' && homeAbbr && awayAbbr) {
@@ -1159,9 +1189,21 @@ const GamePreviewPage = () => {
         }
       })
       .catch(() => setLoading(false));
+
+    // Cleanup live polling on unmount
+    return () => { if (pbpInterval.current) clearInterval(pbpInterval.current); };
   }, [league, id]);
 
-  const tabs = ['preview', 'odds', 'rosters'];
+  // Period label per sport
+  const periodLabel = (sport, num) => {
+    const ord = n => ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th','10th'][n-1] || `${n}th`;
+    if (sport === 'baseball')  return `${ord(num)} Inning`;
+    if (sport === 'hockey')    return num === 4 ? 'Overtime' : num === 5 ? 'Shootout' : `${ord(num)} Period`;
+    if (sport === 'football')  return num === 5 ? 'Overtime' : `Q${num}`;
+    return num === 5 ? 'Overtime' : `Q${num}`; // basketball
+  };
+
+  const tabs = ['preview', 'odds', 'plays', 'rosters'];
 
   if (loading) return (
     <div className="max-w-5xl mx-auto px-4 py-12">
@@ -1427,7 +1469,8 @@ const GamePreviewPage = () => {
                             <span className="text-[#888] text-sm font-bold">{game.away.abbr}</span>
                           </div>
                           <span className="text-[#f0ebe0] font-black text-lg">
-                            {odds.spread != null ? (odds.spread < 0 ? `+${Math.abs(odds.spread)}` : odds.spread === 0 ? 'PK' : `-${odds.spread}`) : '—'}
+                            {odds.awaySpreadPoint != null ? fmtML(odds.awaySpreadPoint) : '—'}
+                            {odds.awaySpreadOdds != null && <span className="text-[#555] text-xs ml-1">({fmtML(odds.awaySpreadOdds)})</span>}
                           </span>
                         </div>
                         <div className="flex items-center justify-between mt-3">
@@ -1436,7 +1479,8 @@ const GamePreviewPage = () => {
                             <span className="text-[#888] text-sm font-bold">{game.home.abbr}</span>
                           </div>
                           <span className="text-[#f0ebe0] font-black text-lg">
-                            {odds.spread != null ? (odds.spread < 0 ? `${odds.spread}` : odds.spread === 0 ? 'PK' : `+${odds.spread}`) : '—'}
+                            {odds.homeSpreadPoint != null ? (odds.homeSpreadPoint === 0 ? 'PK' : fmtML(odds.homeSpreadPoint)) : '—'}
+                            {odds.homeSpreadOdds != null && <span className="text-[#555] text-xs ml-1">({fmtML(odds.homeSpreadOdds)})</span>}
                           </span>
                         </div>
                       </>
@@ -1481,6 +1525,97 @@ const GamePreviewPage = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══ PLAYS tab ══ */}
+      {activeTab === 'plays' && (
+        <div className="space-y-2">
+          {pbpLoading ? (
+            <div className="flex items-center justify-center gap-3 py-20 text-[#555]">
+              <div className="w-5 h-5 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm font-bold uppercase tracking-widest">Loading plays...</span>
+            </div>
+          ) : pbp.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="text-5xl mb-4">🏟️</div>
+              <div className="text-[#555] font-black uppercase tracking-widest text-sm mb-2">
+                {game.isFinal ? 'No play data available' : 'Game hasn\'t started yet'}
+              </div>
+              {!game.isFinal && !game.isLive && (
+                <div className="text-[#444] text-xs">
+                  Play-by-play will appear here once the game tips off
+                </div>
+              )}
+            </div>
+          ) : (() => {
+            // Group plays by period number (pbp is already newest-first)
+            const groups = [];
+            let currentPeriod = null;
+            pbp.forEach(p => {
+              const pNum = p.period?.number ?? 0;
+              if (pNum !== currentPeriod) {
+                currentPeriod = pNum;
+                groups.push({ period: pNum, plays: [] });
+              }
+              groups[groups.length - 1].plays.push(p);
+            });
+            return groups.map((g, gi) => (
+              <div key={gi} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+                {/* Period header */}
+                <div className="flex items-center justify-between px-5 py-3 bg-[#2a2a2a]/50 border-b border-[#2a2a2a]">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-[#888]">
+                    {periodLabel(game.sport, g.period)}
+                  </span>
+                  {gi === 0 && game.isLive && (
+                    <span className="flex items-center gap-1.5 text-[#E21111] text-[9px] font-black uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E21111] animate-pulse" /> Live · Updates every 30s
+                    </span>
+                  )}
+                </div>
+                {/* Plays */}
+                <div className="divide-y divide-[#222]">
+                  {g.plays.map((p, pi) => {
+                    const isScore = p.scoringPlay;
+                    const clock   = p.clock?.displayValue;
+                    return (
+                      <div key={pi}
+                        className={`flex items-start gap-3 px-5 py-3 transition-colors
+                          ${isScore ? 'bg-[#E21111]/5 hover:bg-[#E21111]/8' : 'hover:bg-white/[0.02]'}`}>
+                        {/* Clock */}
+                        <div className="w-10 shrink-0 text-right">
+                          <span className="text-[#444] text-[10px] font-black tabular-nums">{clock || '—'}</span>
+                        </div>
+                        {/* Dot */}
+                        <div className="mt-1.5 shrink-0">
+                          {isScore
+                            ? <div className="w-2 h-2 rounded-full bg-[#E21111]" />
+                            : <div className="w-1.5 h-1.5 rounded-full bg-[#333]" />}
+                        </div>
+                        {/* Play text */}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs leading-relaxed ${isScore ? 'text-[#f0ebe0] font-bold' : 'text-[#888]'}`}>
+                            {p.text}
+                          </p>
+                        </div>
+                        {/* Score after scoring plays */}
+                        {isScore && p.awayScore != null && (
+                          <div className="shrink-0 text-right">
+                            <div className="text-[#f0ebe0] font-black text-sm tabular-nums">
+                              {p.awayScore}–{p.homeScore}
+                            </div>
+                            <div className="text-[#444] text-[9px]">
+                              {game.away.abbr}–{game.home.abbr}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ));
+          })()}
         </div>
       )}
 
