@@ -20,7 +20,7 @@ describe("HealthController", () => {
 
   it("reports the project name", () => {
     const result = controller.health();
-    expect(result.service).toBe("{{PROJECT_NAME}}-backend");
+    expect(result.service).toBe("playcode-bouncebacktalk-app-backend");
   });
 
   it("enqueues a queue health check", async () => {

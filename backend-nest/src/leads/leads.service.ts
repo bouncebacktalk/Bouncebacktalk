@@ -116,7 +116,7 @@ export class LeadsService {
     await this.emailQueue
       .enqueueLeadNotification({
         to: admins,
-        appName: "{{PROJECT_TITLE}}",
+        appName: "bouncebacktalk_app",
         leadId: lead.id,
         name: lead.name,
         email: lead.email,

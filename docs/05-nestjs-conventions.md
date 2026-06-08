@@ -1,6 +1,6 @@
 # 05 - NestJS conventions
 
-The conventions below are non-negotiable for {{PROJECT_TITLE}}. They look slightly verbose but they're the difference between a backend that grows cleanly and a backend that crashes at boot with `Nest can't resolve dependencies of the FooService` because two modules ended up referencing each other.
+The conventions below are non-negotiable for bouncebacktalk_app. They look slightly verbose but they're the difference between a backend that grows cleanly and a backend that crashes at boot with `Nest can't resolve dependencies of the FooService` because two modules ended up referencing each other.
 
 The pattern is lifted directly from PlayCode's own backend-nest, where it has saved us from circular-dependency debugging on every feature we've shipped.
 

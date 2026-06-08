@@ -1,5 +1,5 @@
 {
-  "name": "@{{PROJECT_NAME}}/backend-nest",
+  "name": "@playcode-bouncebacktalk-app/backend-nest",
   "version": "0.1.0",
   "private": true,
   "scripts": {

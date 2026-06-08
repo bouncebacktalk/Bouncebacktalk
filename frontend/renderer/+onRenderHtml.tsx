@@ -6,7 +6,7 @@ import { RootLayout } from "./RootLayout";
 import { ThemeProvider } from "@/apps/ui/theme-provider";
 import "./styles.css";
 
-const PROJECT_TITLE = "{{PROJECT_TITLE}}";
+const PROJECT_TITLE = "bouncebacktalk_app";
 
 // Runs before first paint: applies the saved (or system) theme to <html> so
 // there is no light/dark flash. Mirrors next-themes' storage key ("theme").

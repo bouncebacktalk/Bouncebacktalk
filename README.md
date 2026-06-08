@@ -1,4 +1,4 @@
-# {{PROJECT_TITLE}}
+# bouncebacktalk_app
 
 A full-stack web app: **Vike + React + Tailwind** frontend, **NestJS** backend, running on a NixOS VM.
 
@@ -14,7 +14,7 @@ This project runs on a **permanent NixOS computer**, not a Docker container. Thr
 
 ## Default shape: full-stack
 
-Out of the box {{PROJECT_TITLE}} is a starter for SaaS products and internal tools, built on **shadcn/ui**: a marketing landing, an admin console behind a sidebar (collapsible on desktop, off-canvas drawer on mobile) with KPI cards, a full leads CRM and member management, a standalone member profile, email-password auth with admin roles, a public contact form, plus Postgres, Prisma, Redis, BullMQ, and queued React Email templates.
+Out of the box bouncebacktalk_app is a starter for SaaS products and internal tools, built on **shadcn/ui**: a marketing landing, an admin console behind a sidebar (collapsible on desktop, off-canvas drawer on mobile) with KPI cards, a full leads CRM and member management, a standalone member profile, email-password auth with admin roles, a public contact form, plus Postgres, Prisma, Redis, BullMQ, and queued React Email templates.
 
 The starter includes a working public path, an admin console, and a member surface:
 

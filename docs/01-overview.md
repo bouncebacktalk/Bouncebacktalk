@@ -1,6 +1,6 @@
 # 01 - Overview
 
-{{PROJECT_TITLE}} is a full-stack web app: a React+Vike frontend with server-side rendering, a NestJS backend serving an API at `/api/*`, running on a NixOS-based Sky VM.
+bouncebacktalk_app is a full-stack web app: a React+Vike frontend with server-side rendering, a NestJS backend serving an API at `/api/*`, running on a NixOS-based Sky VM.
 
 It starts **full-stack**: Postgres, Prisma, auth/users, Redis, BullMQ, queued password-reset emails, and React Email templates are wired on first boot. Build business logic immediately; remove services later only if you truly do not need them.
 
@@ -26,7 +26,7 @@ The frontend is built on **shadcn/ui** (new-york): a marketing landing (`/`), em
 ## Where things live
 
 ```
-{{PROJECT_NAME}}/
+playcode-bouncebacktalk-app/
 ├── frontend/           # Vike app - pages, frontend apps, server entrypoint
 ├── frontend-spa/       # Browser-import only; absent in fresh full-stack projects
 ├── backend-nest/       # NestJS app - controllers, services, modules

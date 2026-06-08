@@ -13,7 +13,7 @@ import { Page } from "./+Page";
 describe("IndexPage", () => {
   it("renders the project wordmark", () => {
     render(<Page />);
-    expect(screen.getAllByText(/{{PROJECT_TITLE}}/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/bouncebacktalk_app/).length).toBeGreaterThan(0);
   });
 
   it("renders signed-out auth actions", () => {

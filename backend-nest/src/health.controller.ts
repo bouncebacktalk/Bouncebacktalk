@@ -22,7 +22,7 @@ export class HealthController {
   health() {
     return {
       status: "ok",
-      service: "{{PROJECT_NAME}}-backend",
+      service: "playcode-bouncebacktalk-app-backend",
       uptime: process.uptime(),
     };
   }
@@ -48,7 +48,7 @@ export class HealthController {
 
     return {
       status: "ready",
-      service: "{{PROJECT_NAME}}-backend",
+      service: "playcode-bouncebacktalk-app-backend",
       uptime: process.uptime(),
       checks,
     };

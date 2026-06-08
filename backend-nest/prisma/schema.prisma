@@ -1,4 +1,4 @@
-// Prisma schema for {{PROJECT_TITLE}}.
+// Prisma schema for bouncebacktalk_app.
 //
 // Models below power the default auth kit (User, RefreshToken,
 // PasswordReset). If you'll never use auth, delete the models here

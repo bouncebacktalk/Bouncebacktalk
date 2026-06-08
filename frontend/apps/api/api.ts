@@ -33,7 +33,7 @@ export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   skipAuthRefresh?: boolean;
 }
 
-const ACCESS_TOKEN_STORAGE_KEY = "{{PROJECT_NAME}}:auth:access-token";
+const ACCESS_TOKEN_STORAGE_KEY = "playcode-bouncebacktalk-app:auth:access-token";
 
 let memoryAccessToken: string | null = null;
 

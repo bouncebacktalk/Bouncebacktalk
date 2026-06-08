@@ -27,7 +27,7 @@ export function loadE2EEnv(): void {
   process.env.AUTH_COOKIE_SECURE ??= "false";
   process.env.ADMIN_EMAILS ??= "admin@example.com";
   process.env.MAIL_TRANSPORT ??= "console";
-  process.env.MAIL_FROM ??= "{{PROJECT_TITLE}} <noreply@example.com>";
+  process.env.MAIL_FROM ??= "bouncebacktalk_app <noreply@example.com>";
   process.env.PUBLIC_URL ??= "http://localhost:3000";
 }
 

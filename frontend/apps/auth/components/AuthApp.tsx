@@ -16,7 +16,7 @@ import { useCurrentUser, type SessionUser } from "../useCurrentUser";
 
 // Substituted at provision time. Used as the brand/wordmark, NOT as the hero
 // headline - a starter should greet you with a tagline you can make your own.
-const PROJECT_TITLE = "{{PROJECT_TITLE}}";
+const PROJECT_TITLE = "bouncebacktalk_app";
 
 interface Session {
   user: SessionUser;

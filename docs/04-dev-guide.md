@@ -1,6 +1,6 @@
 # 04 - Dev guide
 
-Working on {{PROJECT_TITLE}} inside the VM. Quick reference for the common loops.
+Working on bouncebacktalk_app inside the VM. Quick reference for the common loops.
 
 ## Default Services
 
@@ -90,7 +90,7 @@ If the public URL fails but `localhost:3000/api/health` works directly, the rout
 
 ```bash
 sudo -u postgres psql                           # superuser
-sudo -u postgres psql -d {{PROJECT_NAME}}       # your db
+sudo -u postgres psql -d playcode-bouncebacktalk-app       # your db
 \dt                                             # list tables
 \d leads                                       # contact-form submissions
 

@@ -1,7 +1,7 @@
 import { Logo } from "../ui/Logo";
 
 // Substituted at provision time. The shell/auth wordmark.
-const PROJECT_TITLE = "{{PROJECT_TITLE}}";
+const PROJECT_TITLE = "bouncebacktalk_app";
 
 /** Brand logo mark + wordmark, reused across the shell and profile. */
 export function Brand() {

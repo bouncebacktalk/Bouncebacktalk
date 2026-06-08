@@ -59,7 +59,7 @@ const EnvSchema = z.object({
   // `console` writes the email to stdout (zero setup, perfect for dev).
   // `resend` requires RESEND_API_KEY and a verified sender domain.
   MAIL_TRANSPORT: z.enum(["console", "resend"]).default("console"),
-  MAIL_FROM: z.string().default("{{PROJECT_TITLE}} <noreply@example.com>"),
+  MAIL_FROM: z.string().default("bouncebacktalk_app <noreply@example.com>"),
   RESEND_API_KEY: z.string().default(""),
 
   // ─── Observability ─────────────────────────────────────────────────────────

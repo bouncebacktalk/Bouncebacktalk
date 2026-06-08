@@ -167,7 +167,7 @@ export class AuthService {
     const resetUrl = `${this.config.env.PUBLIC_URL}/reset-password?token=${rawToken}`;
     await this.emailQueue.enqueuePasswordReset({
       to: user.email,
-      appName: "{{PROJECT_TITLE}}",
+      appName: "bouncebacktalk_app",
       resetUrl,
       expiresIn: "1 hour",
     });

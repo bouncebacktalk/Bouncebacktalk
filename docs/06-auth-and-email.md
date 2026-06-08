@@ -1,6 +1,6 @@
 # 06 - Auth & email
 
-How the default auth, queued email, React Email templates, and transports work in {{PROJECT_TITLE}}.
+How the default auth, queued email, React Email templates, and transports work in bouncebacktalk_app.
 
 ## TL;DR
 
@@ -268,7 +268,7 @@ Two backends, picked at boot from `MAIL_TRANSPORT`:
 
 ```env
 MAIL_TRANSPORT=console
-MAIL_FROM={{PROJECT_TITLE}} <noreply@example.com>
+MAIL_FROM=bouncebacktalk_app <noreply@example.com>
 ```
 
 Every `EmailService.send(...)` call writes the formatted message to stdout via the structured logger. View with `journalctl -u playcode-backend -f`. Zero setup, zero account creation, perfect for development and tests.
@@ -283,7 +283,7 @@ Every `EmailService.send(...)` call writes the formatted message to stdout via t
 4. Add to `.env.local` at the repo root:
    ```bash
    MAIL_TRANSPORT=resend
-   MAIL_FROM="{{PROJECT_TITLE}} <hello@your-domain.com>"
+   MAIL_FROM="bouncebacktalk_app <hello@your-domain.com>"
    RESEND_API_KEY=re_...
    ```
 5. `sudo systemctl restart playcode-backend`
