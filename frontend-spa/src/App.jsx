@@ -150,7 +150,7 @@ const groupStandings = (teams, rawStandings, league) => {
 const fetchTeamRoster = async (league, teamKey) => {
   if (league === 'nhl') return [];
   try {
-    const res = await fetch(`${SPORTS_BASE}/${league}/scores/json/Players/${teamKey.toUpperCase()}?key=${SPORTS_KEY}`);
+    const res = await fetch(`${SPORTS_BASE}/${league}/scores/json/PlayersBasic/${teamKey.toUpperCase()}?key=${SPORTS_KEY}`);
     const data = await res.json();
     return Array.isArray(data) ? data.filter(p => p.Status === 'Active') : [];
   } catch { return []; }
