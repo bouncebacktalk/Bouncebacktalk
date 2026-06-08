@@ -715,6 +715,209 @@ const ScoresPage = () => {
   );
 };
 
+// ─── BEST BETS PAGE ───────────────────────────────────────────────────────────
+const ALL_BETS = [
+  {
+    id: 1, league: 'NBA', game: 'OKC vs IND', pick: 'Thunder -4.5', odds: '-110',
+    confidence: 87, trend: '+12%', value: 'HIGH',
+    analysis: "OKC's home-court edge combined with SGA's playoff form makes this a must-play. Indiana's defense has no answer for the Thunder pick-and-roll — they've allowed 118+ in 4 of their last 5 road games.",
+    injuries: 'Haliburton Q (hamstring)', starters: 'SGA vs Haliburton',
+    record: '18-7 last 25', time: '8:30 PM ET',
+  },
+  {
+    id: 2, league: 'MLB', game: 'NYY vs BOS', pick: 'Over 9.5', odds: '-105',
+    confidence: 74, trend: '+5%', value: 'MED',
+    analysis: "Both bullpens are gassed after back-to-back extra-inning games. Yankee Stadium wind is blowing out to right field today, and both starters are sitting under 5 innings average over their last 3 starts.",
+    injuries: 'Cole Q (elbow)', starters: 'Cole vs Sale',
+    record: '14-9 last 23', time: '7:05 PM ET',
+  },
+  {
+    id: 3, league: 'NFL', game: 'KC vs LV', pick: 'Chiefs ML', odds: '-180',
+    confidence: 92, trend: '+18%', value: 'HIGH',
+    analysis: "Mahomes at home is a different animal. Raiders have no answer for the Chiefs WR depth post-free agency. KC's defense has held opponents under 17 in 3 straight. Fade the Raiders until proven otherwise.",
+    injuries: 'None reported', starters: 'Mahomes vs Minshew',
+    record: '22-5 last 27', time: '4:25 PM ET',
+  },
+  {
+    id: 4, league: 'NHL', game: 'FLA vs EDM', pick: 'Florida ML', odds: '+120',
+    confidence: 68, trend: '+8%', value: 'VALUE',
+    analysis: "Florida has home-ice advantage and Bobrovsky has been lights-out in elimination spots (.934 SV%). Edmonton's power play has been neutralized by the Panthers' penalty kill unit — 1-for-12 this series.",
+    injuries: 'McDavid limited (upper body)', starters: 'Bobrovsky vs Skinner',
+    record: '11-6 last 17', time: '8:00 PM ET',
+  },
+  {
+    id: 5, league: 'NBA', game: 'OKC vs IND', pick: 'SGA Over 32.5 pts', odds: '-115',
+    confidence: 81, trend: '+9%', value: 'HIGH',
+    analysis: "SGA has gone over this line in 6 of his last 7 playoff games. Indiana's perimeter defense ranks 28th in the league, and SGA averages 36.2 when Haliburton is less than 100%. The juice is worth the squeeze.",
+    injuries: 'Haliburton Q (hamstring)', starters: 'SGA focused matchup',
+    record: '16-5 last 21', time: '8:30 PM ET',
+  },
+  {
+    id: 6, league: 'MLB', game: 'LAD vs SF', pick: 'Dodgers -1.5', odds: '+105',
+    confidence: 71, trend: '+3%', value: 'VALUE',
+    analysis: "Ohtani is at full health and has a 1.84 ERA over his last 4 starts at home. Giants' offense ranks 26th vs. left-handed pitching. The run line plus positive juice is a gift.",
+    injuries: 'None key', starters: 'Ohtani vs Webb',
+    record: '13-7 last 20', time: '10:10 PM ET',
+  },
+];
+
+const BestBetsPage = () => {
+  const [activeLeague, setActiveLeague] = useState('all');
+  const [sortBy, setSortBy] = useState('confidence');
+  const [expandedId, setExpandedId] = useState(null);
+
+  const tabs = [{ key: 'all', label: 'All' }, ...LEAGUES.map(l => ({ key: l.key, label: l.label }))];
+  const filtered = (activeLeague === 'all' ? ALL_BETS : ALL_BETS.filter(b => b.league.toLowerCase() === activeLeague))
+    .sort((a, b) => sortBy === 'confidence' ? b.confidence - a.confidence : 0);
+
+  const valueColor = v => v === 'HIGH' ? 'text-green-400 bg-green-400/10 border-green-400/20'
+    : v === 'VALUE' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20'
+    : 'text-blue-400 bg-blue-400/10 border-blue-400/20';
+
+  const confColor = c => c >= 80 ? 'text-green-400' : c >= 65 ? 'text-yellow-400' : 'text-[#E21111]';
+  const confBg = c => c >= 80 ? 'bg-green-400' : c >= 65 ? 'bg-yellow-400' : 'bg-[#E21111]';
+
+  const overall = Math.round(filtered.reduce((s, b) => s + b.confidence, 0) / (filtered.length || 1));
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-1 h-8 bg-[#E21111] rounded-full" />
+            <h1 className="text-3xl font-black uppercase tracking-tight text-[#f0ebe0]">Today's Best Bets</h1>
+          </div>
+          <p className="text-[#555] text-sm pl-4">AI-powered picks · Updated {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        </div>
+        {/* Summary stats */}
+        <div className="flex items-center gap-3">
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 text-center">
+            <div className="text-2xl font-black text-[#f0ebe0]">{filtered.length}</div>
+            <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Picks</div>
+          </div>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 text-center">
+            <div className={`text-2xl font-black ${confColor(overall)}`}>{overall}%</div>
+            <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Avg Conf.</div>
+          </div>
+          <div className="bg-green-400/10 border border-green-400/20 rounded-xl px-4 py-3 text-center">
+            <div className="text-2xl font-black text-green-400">68%</div>
+            <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Win Rate</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+        <span className="text-yellow-400 text-lg">⚠️</span>
+        <p className="text-[#555] text-xs leading-relaxed">For entertainment purposes only. Please gamble responsibly. Must be 21+ in applicable states.</p>
+      </div>
+
+      {/* League filter + sort */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 flex-1">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setActiveLeague(t.key)}
+              className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shrink-0 ${
+                activeLeague === t.key ? 'bg-[#E21111] text-white' : 'bg-[#1a1a1a] text-[#888] hover:text-[#f0ebe0] border border-[#2a2a2a]'
+              }`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-[#888] text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-[#E21111] shrink-0">
+          <option value="confidence">Sort: Confidence</option>
+          <option value="default">Sort: Default</option>
+        </select>
+      </div>
+
+      {/* Bet cards */}
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filtered.map(bet => (
+          <div key={bet.id}
+            className="bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#E21111]/30 rounded-2xl overflow-hidden transition-all">
+
+            {/* Card header */}
+            <div className="bg-gradient-to-r from-[#1f1f1f] to-[#1a1a1a] px-5 pt-5 pb-4 border-b border-[#2a2a2a]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-2 py-0.5 rounded-full">{bet.league}</span>
+                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${valueColor(bet.value)}`}>{bet.value} VALUE</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[#888] text-xs mb-1">{bet.game} · {bet.time}</div>
+                  <div className="text-[#f0ebe0] font-black text-xl leading-tight">{bet.pick}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[#555] text-[9px] uppercase font-bold mb-0.5">Odds</div>
+                  <div className="text-[#f0ebe0] font-black text-lg">{bet.odds}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Confidence */}
+            <div className="px-5 py-4 border-b border-[#2a2a2a]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#555]">Confidence</span>
+                <span className={`font-black text-sm ${confColor(bet.confidence)}`}>{bet.confidence}%</span>
+              </div>
+              <div className="w-full bg-[#2a2a2a] rounded-full h-2 overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-1000 ${confBg(bet.confidence)}`}
+                  style={{ width: `${bet.confidence}%` }} />
+              </div>
+              <div className="flex items-center gap-1 mt-2 text-green-400 text-[10px] font-bold">
+                <TrendingIcon size={11} /> {bet.trend} this week · Record: {bet.record}
+              </div>
+            </div>
+
+            {/* Analysis */}
+            <div className="px-5 py-4">
+              <p className={`text-[#888] text-xs leading-relaxed ${expandedId === bet.id ? '' : 'line-clamp-3'}`}>
+                {bet.analysis}
+              </p>
+              {bet.analysis.length > 120 && (
+                <button onClick={() => setExpandedId(expandedId === bet.id ? null : bet.id)}
+                  className="text-[#E21111] text-[10px] font-black uppercase tracking-wider mt-1 hover:text-red-400">
+                  {expandedId === bet.id ? 'Show less ↑' : 'Read more ↓'}
+                </button>
+              )}
+
+              <div className="mt-4 space-y-2">
+                <div className="flex items-start gap-2 text-[11px]">
+                  <span className="text-[#555] uppercase font-black tracking-wider shrink-0 w-16">Injuries</span>
+                  <span className="text-[#888]">{bet.injuries}</span>
+                </div>
+                <div className="flex items-start gap-2 text-[11px]">
+                  <span className="text-[#555] uppercase font-black tracking-wider shrink-0 w-16">Starters</span>
+                  <span className="text-[#888]">{bet.starters}</span>
+                </div>
+              </div>
+
+              <Link to={`/game/${bet.league.toLowerCase()}/${bet.id}`}
+                className="mt-4 w-full flex items-center justify-center gap-2 bg-[#E21111]/10 hover:bg-[#E21111] border border-[#E21111]/30 hover:border-[#E21111] rounded-xl py-2.5 text-[#E21111] hover:text-white text-[11px] font-black uppercase tracking-widest transition-all">
+                Full Game Preview <ChevronRight size={12} />
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Newsletter CTA */}
+      <div className="mt-12 bg-gradient-to-r from-[#E21111]/10 to-transparent border border-[#E21111]/20 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6">
+        <div className="flex-1">
+          <h3 className="text-lg font-black uppercase text-[#f0ebe0] mb-1">Get Picks Before They Drop</h3>
+          <p className="text-[#555] text-sm">Tomorrow's best bets in your inbox every morning at 9AM. Free forever.</p>
+        </div>
+        <Link to="/" className="shrink-0 bg-[#E21111] hover:bg-red-700 text-white font-black uppercase text-xs px-6 py-3 rounded-xl tracking-widest transition-colors">
+          Subscribe Free →
+        </Link>
+      </div>
+    </div>
+  );
+};
+
 // ─── PLACEHOLDER PAGES ────────────────────────────────────────────────────────
 const ComingSoon = ({ title }) => (
   <div className="min-h-screen flex items-center justify-center">
@@ -764,7 +967,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/scores" element={<ScoresPage />} />
-            <Route path="/best-bets" element={<ComingSoon title="Best Bets" />} />
+            <Route path="/best-bets" element={<BestBetsPage />} />
             <Route path="/league/:slug" element={<ComingSoon title="League Page" />} />
             <Route path="/game/:league/:id" element={<ComingSoon title="Game Preview" />} />
             <Route path="/team/:league/:id" element={<ComingSoon title="Team Page" />} />
