@@ -28,7 +28,7 @@ deploy:
   healthcheck:
     path: /api/health/ready        # HTTP path to GET
     expect: '^[23]\d\d$'           # Regex matched against the response's HTTP status code
-    timeoutSec: 60                 # Total polling budget
+    timeoutSec: 120                # Total polling budget
     intervalSec: 5                 # Pause between polls
 
 # Systemd units this project runs. The editor lists them in the services
