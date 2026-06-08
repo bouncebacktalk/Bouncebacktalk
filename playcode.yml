@@ -1,0 +1,39 @@
+# playcode.yml — deploy config for this project.
+#
+# Edit + commit + re-publish to change deploy behavior. Every field
+# here drives runtime behaviour; if it doesn't, it's not here.
+
+# ─────────────────────────────────────────────────────────────────────────
+# Deploy — runs on every publish, against the production VM.
+# Includes the deploy script itself, its timeout, and the post-deploy
+# healthcheck (which also runs at provision time against the dev VM).
+# ─────────────────────────────────────────────────────────────────────────
+
+deploy:
+  # Accepts:
+  #   string  — passed through `bash -c "..."` (shell expansion)
+  #             e.g. command: ./deploy.sh
+  #             e.g. command: "pnpm install && pnpm -r build"
+  #   array   — execve directly (no shell expansion); safer for arg-heavy invocations
+  #             e.g. command: ["bash", "deploy.sh", "--verbose"]
+  command: ./deploy.sh
+
+  # Hard ceiling on a single deploy run. Past this the deploy is aborted.
+  # Default 15 min covers a typical npm install + build + restart.
+  timeoutSec: 900
+
+  # Runs after `deploy.command` completes (publish), and after `setup.sh`
+  # completes (provision). Polls the URL until status matches `expect`
+  # or `timeoutSec` elapses.
+  healthcheck:
+    path: /api/health/ready        # HTTP path to GET
+    expect: '^[23]\d\d$'           # Regex matched against the response's HTTP status code
+    timeoutSec: 60                 # Total polling budget
+    intervalSec: 5                 # Pause between polls
+
+# Systemd units this project runs. The editor lists them in the services
+# panel and `journalctl -u <name>` follows them. NOT load-bearing for
+# the deploy itself — your deploy.sh restarts what it needs.
+services:
+  - playcode-frontend
+  - playcode-backend

@@ -1,0 +1,142 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Theme tokens. A Stripe-inspired system: an indigo (#635BFF-ish) primary,
+ * cool slate neutrals, white cards on a faintly tinted canvas in light mode,
+ * and a deep navy surface in dark mode. Recolor by editing the values here.
+ */
+:root {
+  color-scheme: light;
+  --background: oklch(0.98 0.004 264);
+  --foreground: oklch(0.27 0.04 268);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.56 0.22 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.965 0.006 264);
+  --secondary-foreground: oklch(0.32 0.035 268);
+  --muted: oklch(0.97 0.005 264);
+  --muted-foreground: oklch(0.55 0.03 264);
+  --accent: oklch(0.95 0.025 277);
+  --accent-foreground: oklch(0.4 0.13 277);
+  --destructive: oklch(0.58 0.21 18);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.92 0.007 264);
+  --input: oklch(0.9 0.008 264);
+  --ring: oklch(0.56 0.22 277);
+  --success: oklch(0.62 0.14 162);
+  --warning: oklch(0.75 0.15 75);
+  --radius: 0.5rem;
+  /* Sidebar tracks the app theme (card / primary / muted / border), so the
+     shadcn Sidebar matches light + dark automatically - no separate palette. */
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.19 0.025 270);
+  --foreground: oklch(0.93 0.01 268);
+  --card: oklch(0.23 0.025 270);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.23 0.025 270);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.64 0.2 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0.025 270);
+  --secondary-foreground: oklch(0.93 0.01 268);
+  --muted: oklch(0.26 0.022 270);
+  --muted-foreground: oklch(0.7 0.025 268);
+  --accent: oklch(0.32 0.06 277);
+  --accent-foreground: oklch(0.92 0.03 277);
+  --destructive: oklch(0.62 0.21 18);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.3 0.02 270);
+  --input: oklch(0.34 0.02 270);
+  --ring: oklch(0.64 0.2 277);
+  --success: oklch(0.68 0.15 162);
+  --warning: oklch(0.78 0.15 75);
+  /* Sidebar tokens reference the semantic vars above, which already flip here. */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-sm: calc(var(--radius) - 0.125rem);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 0.125rem);
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    min-height: 100%;
+    background: var(--background);
+  }
+
+  body {
+    min-height: 100%;
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}

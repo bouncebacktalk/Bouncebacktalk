@@ -1,0 +1,167 @@
+# =============================================================================
+# Dependencies
+# =============================================================================
+node_modules/
+.pnpm-store/
+jspm_packages/
+bower_components/
+
+# =============================================================================
+# Build output
+# =============================================================================
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.cache/
+.parcel-cache/
+.turbo/
+.vite/
+.vite-temp/
+storybook-static/
+*.tsbuildinfo
+
+# =============================================================================
+# Logs
+# =============================================================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs/
+
+# =============================================================================
+# Environment files — POLICY
+# =============================================================================
+# `.env`        — COMMITTED. Default config that's the same for everyone
+#                 (non-secret defaults: app name, public URLs, feature flags).
+# `.env.local`  — NOT COMMITTED. Per-developer overrides on top of `.env`
+#                 (database password, API keys, anything secret or personal).
+#
+# `.env.<environment>` (`.env.development`, `.env.production`, …) — committed
+# `.env.<environment>.local` (`.env.development.local`, …) — not committed
+#
+# This mirrors the convention Vite, Next.js, Create-React-App, and most
+# modern frameworks use. If you put a secret in `.env`, it ends up in the
+# repo. Use `.env.local` for anything you wouldn't paste in chat.
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =============================================================================
+# Operating system
+# =============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# =============================================================================
+# Editor / IDE
+# =============================================================================
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.fleet/
+.zed/
+
+# =============================================================================
+# Tests / coverage
+# =============================================================================
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+junit.xml
+test-results/
+playwright-report/
+playwright/.cache/
+
+# =============================================================================
+# Python (if your project includes Python tooling)
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =============================================================================
+# Misc / temporary
+# =============================================================================
+.tmp/
+tmp/
+temp/
+.scratch/
+*.local
+*.bak
+*.orig
+
+# =============================================================================
+# Data, not code (per ADR-0090: repo-bloat-protection)
+# =============================================================================
+# Big files belong on the VM disk, not in git. Forgejo enforces a 1 GB (Pro) /
+# 5 GB (Business) total repo-size quota; pushes that would exceed it are
+# rejected. Keep datasets, uploads, and generated blobs out of git so the
+# quota only counts what's actually code. Use git-lfs if you genuinely need a
+# large file under version control.
+data/
+uploads/
+.cache/
+
+# Common dataset / binary blob extensions
+*.parquet
+*.feather
+*.arrow
+*.pkl
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# Archives (don't commit a tarball; commit its source layout instead)
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+
+# Large source-art / video (small media still fine in /public/)
+*.psd
+*.ai
+*.mov
+*.mp4
+*.mkv
+
+# =============================================================================
+# Project-specific
+# =============================================================================
+.bake-mode

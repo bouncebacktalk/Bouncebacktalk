@@ -1,0 +1,98 @@
+// Prisma schema for {{PROJECT_TITLE}}.
+//
+// Models below power the default auth kit (User, RefreshToken,
+// PasswordReset). If you'll never use auth, delete the models here
+// plus the auth/ and users/ feature modules.
+//
+// Workflow:
+//   pnpm prisma:migrate     # creates a migration + applies it (dev)
+//   pnpm prisma:generate    # regenerates the typed client
+//   pnpm prisma:studio      # browse data on :5555
+//
+// Add your application models below the auth ones.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: connection URL lives in prisma.config.ts (for migrate/studio)
+// and is passed to PrismaClient via the @prisma/adapter-pg driver adapter
+// at runtime (see prisma.service.ts). The schema only declares which
+// dialect to generate for.
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  isAdmin      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordReset[]
+
+  @@map("users")
+}
+
+/// Long-lived refresh tokens. We store SHA-256 hashes, never raw tokens -
+/// even with a DB compromise an attacker can't replay user sessions.
+/// Revoked rows are kept for an audit window. Add a scheduled cleanup job
+/// once your product has retention requirements.
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+/// One-shot password-reset tokens. Same hash-storage policy as refresh
+/// tokens. Single-use enforced via `usedAt`.
+model PasswordReset {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+// ─── Contact and CRM ─────────────────────────────────────────────────────────
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  ARCHIVED
+}
+
+/// Public contact-form submissions. The admin CRM reads this table through
+/// AdminGuard-protected endpoints, never directly from browser code.
+model Lead {
+  id        Int        @id @default(autoincrement())
+  name      String?
+  email     String
+  company   String?
+  message   String
+  source    String     @default("contact")
+  status    LeadStatus @default(NEW)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([status, createdAt])
+  @@map("leads")
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn",
+    "style": "off"
+  },
+  "rules": {
+    "no-console": "off",
+    "no-unused-vars": "warn",
+    "no-debugger": "error",
+    "no-extraneous-class": "off",
+    "typescript-eslint/no-extraneous-class": "off"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "overrides": [
+    {
+      "files": ["frontend/**/*.{ts,tsx,js,jsx}"],
+      "env": { "browser": true, "node": true },
+      "rules": {
+        "react/react-in-jsx-scope": "off",
+        "react/jsx-no-target-blank": "warn",
+        "react/jsx-key": "error"
+      }
+    },
+    {
+      "files": ["backend-nest/**/*.ts"],
+      "env": { "node": true, "browser": false },
+      "rules": {
+        "no-process-exit": "off",
+        "typescript-eslint/no-extraneous-class": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+      "rules": {
+        "no-unused-vars": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.cache/**",
+    "**/coverage/**",
+    "frontend/dist/**",
+    "backend-nest/dist/**",
+    "backend-nest/prisma/migrations/**"
+  ]
+}

@@ -1,0 +1,14 @@
+packages:
+  - frontend
+  - backend-nest
+  # frontend-spa/ exists only after a browser-import promote (the
+  # cloud-editor flow that lifts an existing browser project into a
+  # cloud VM). Listing it here unconditionally is safe — pnpm
+  # silently ignores missing workspace packages, and when the dir
+  # *does* exist, `pnpm install` at the root resolves its deps + sets
+  # up its node_modules so the playcode-frontend-spa systemd unit
+  # can run `pnpm dev` without "node_modules missing" errors.
+  - frontend-spa
+
+# pnpm config (onlyBuiltDependencies, etc.) lives in package.json — pinned
+# to pnpm 10.32.1 via packageManager + corepack at bake time.
