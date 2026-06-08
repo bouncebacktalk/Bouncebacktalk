@@ -918,6 +918,374 @@ const BestBetsPage = () => {
   );
 };
 
+// ─── GAME PREVIEW PAGE ───────────────────────────────────────────────────────
+const GamePreviewPage = () => {
+  const { league, id } = useParams();
+  const [game, setGame] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('preview');
+
+  useEffect(() => {
+    const leagueObj = LEAGUES.find(l => l.key === league);
+    if (!leagueObj) { setLoading(false); return; }
+    fetch(espnUrl(leagueObj.sport, league))
+      .then(r => r.json())
+      .then(data => {
+        const ev = data.events?.find(e => e.id === id) || data.events?.[0];
+        if (!ev) { setLoading(false); return; }
+        const comp = ev.competitions?.[0];
+        const home = comp?.competitors?.find(c => c.homeAway === 'home');
+        const away = comp?.competitors?.find(c => c.homeAway === 'away');
+        setGame({
+          id: ev.id,
+          name: ev.name,
+          league: leagueObj.label,
+          venue: comp?.venue?.fullName || 'TBD',
+          city: comp?.venue?.address?.city || '',
+          date: ev.date,
+          status: comp?.status,
+          home: {
+            name: home?.team?.displayName || home?.team?.abbreviation || '',
+            abbr: home?.team?.abbreviation || '',
+            logo: home?.team?.logo || '',
+            score: home?.score || '0',
+            record: home?.records?.[0]?.summary || '',
+            color: home?.team?.color ? `#${home.team.color}` : '#333',
+          },
+          away: {
+            name: away?.team?.displayName || away?.team?.abbreviation || '',
+            abbr: away?.team?.abbreviation || '',
+            logo: away?.team?.logo || '',
+            score: away?.score || '0',
+            record: away?.records?.[0]?.summary || '',
+            color: away?.team?.color ? `#${away.team.color}` : '#333',
+          },
+          isLive: comp?.status?.type?.state === 'in',
+          isFinal: comp?.status?.type?.completed === true,
+          statusText: comp?.status?.type?.shortDetail || '',
+        });
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [league, id]);
+
+  // Static enrichment data
+  const preview = {
+    prediction: { winner: game?.home?.abbr || 'HOME', confidence: 72, spread: '-3.5' },
+    aiAnalysis: `This matchup hinges on which team controls the pace. The home side has been dominant in their last 5 home games, averaging 118 points while holding opponents to 104. Watch the second quarter — that's where this game will be decided. Key factor: if the away team's star player is less than 100%, the line moves significantly.`,
+    keyFactors: [
+      { label: 'Home Court Advantage', impact: 'HIGH', desc: '8-2 at home this postseason' },
+      { label: 'Rest Differential', impact: 'MED', desc: 'Home had 2 extra days rest' },
+      { label: 'Injury Report', impact: 'HIGH', desc: 'Star player questionable' },
+      { label: 'Head to Head', impact: 'MED', desc: 'Home leads series 2-1' },
+    ],
+    injuries: [
+      { team: 'HOME', player: 'Star PG', status: 'Questionable', detail: 'Hamstring tightness' },
+      { team: 'AWAY', player: 'Starting SF', status: 'Probable', detail: 'Ankle soreness' },
+    ],
+    starters: {
+      home: ['PG: Player A', 'SG: Player B', 'SF: Player C', 'PF: Player D', 'C: Player E'],
+      away: ['PG: Player F', 'SG: Player G', 'SF: Player H', 'PF: Player I', 'C: Player J'],
+    },
+    recentForm: {
+      home: ['W', 'W', 'L', 'W', 'W'],
+      away: ['W', 'L', 'W', 'L', 'W'],
+    },
+    h2h: [
+      { date: 'May 15', result: 'Home 112 – Away 108' },
+      { date: 'May 12', result: 'Away 119 – Home 115' },
+      { date: 'May 10', result: 'Home 124 – Away 110' },
+    ],
+    odds: { spread: '-3.5 (-110)', total: '224.5 (-110/-110)', moneyline: '-165 / +140' },
+  };
+
+  const tabs = ['preview', 'odds', 'starters', 'h2h'];
+
+  if (loading) return (
+    <div className="max-w-5xl mx-auto px-4 py-12">
+      <div className="bg-[#1a1a1a] rounded-2xl h-48 animate-pulse mb-6" />
+      <div className="grid md:grid-cols-3 gap-4">
+        {[...Array(6)].map((_, i) => <div key={i} className="bg-[#1a1a1a] rounded-2xl h-32 animate-pulse" />)}
+      </div>
+    </div>
+  );
+
+  if (!game) return (
+    <div className="min-h-screen flex items-center justify-center text-center">
+      <div>
+        <div className="text-5xl mb-4">🏟️</div>
+        <h2 className="text-2xl font-black uppercase text-[#f0ebe0] mb-2">Game Not Found</h2>
+        <Link to="/scores" className="text-[#E21111] font-bold text-sm hover:underline">← Back to Scores</Link>
+      </div>
+    </div>
+  );
+
+  const impactColor = i => i === 'HIGH' ? 'text-[#E21111] bg-[#E21111]/10 border-[#E21111]/20'
+    : i === 'MED' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20'
+    : 'text-green-400 bg-green-400/10 border-green-400/20';
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-[#555] text-xs mb-6">
+        <Link to="/" className="hover:text-[#f0ebe0]">Home</Link>
+        <span>/</span>
+        <Link to="/scores" className="hover:text-[#f0ebe0]">Scores</Link>
+        <span>/</span>
+        <span className="text-[#888]">{game.away.abbr} vs {game.home.abbr}</span>
+      </div>
+
+      {/* Scoreboard hero */}
+      <div className="relative rounded-2xl overflow-hidden mb-6 bg-gradient-to-br from-[#1a1a1a] to-[#111]">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#E21111]/5 via-transparent to-[#E21111]/5" />
+        <div className="relative px-6 py-8">
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-3 py-1 rounded-full">{game.league}</span>
+            {game.isLive
+              ? <span className="flex items-center gap-1.5 text-[#E21111] text-[10px] font-black uppercase bg-[#E21111]/10 px-3 py-1 rounded-full border border-[#E21111]/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#E21111] animate-pulse" /> LIVE · {game.statusText}
+                </span>
+              : <span className="text-[#555] text-[10px] font-bold uppercase bg-[#2a2a2a] px-3 py-1 rounded-full">
+                  {game.isFinal ? 'Final' : game.statusText}
+                </span>
+            }
+          </div>
+
+          {/* Teams + Score */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-2xl mx-auto">
+            {/* Away */}
+            <div className="flex flex-col items-center gap-3">
+              {game.away.logo
+                ? <img src={game.away.logo} alt={game.away.name} className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-lg" />
+                : <div className="w-16 h-16 rounded-full bg-[#2a2a2a] flex items-center justify-center text-xl font-black">{game.away.abbr?.[0]}</div>
+              }
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black text-sm md:text-base">{game.away.abbr}</div>
+                <div className="text-[#555] text-[10px]">{game.away.record}</div>
+              </div>
+            </div>
+
+            {/* Score */}
+            <div className="text-center px-4">
+              {(game.isLive || game.isFinal) ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl md:text-6xl font-black tabular-nums text-[#f0ebe0]">{game.away.score}</span>
+                  <span className="text-[#333] text-2xl font-black">–</span>
+                  <span className="text-4xl md:text-6xl font-black tabular-nums text-[#f0ebe0]">{game.home.score}</span>
+                </div>
+              ) : (
+                <div className="text-[#888] font-black text-lg">VS</div>
+              )}
+              <div className="text-[#555] text-[10px] mt-2">{game.venue}{game.city ? `, ${game.city}` : ''}</div>
+            </div>
+
+            {/* Home */}
+            <div className="flex flex-col items-center gap-3">
+              {game.home.logo
+                ? <img src={game.home.logo} alt={game.home.name} className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-lg" />
+                : <div className="w-16 h-16 rounded-full bg-[#2a2a2a] flex items-center justify-center text-xl font-black">{game.home.abbr?.[0]}</div>
+              }
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black text-sm md:text-base">{game.home.abbr}</div>
+                <div className="text-[#555] text-[10px]">{game.home.record}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick odds */}
+          <div className="mt-6 flex items-center justify-center gap-6 text-center">
+            {[['Spread', preview.odds.spread], ['Total', preview.odds.total], ['Moneyline', preview.odds.moneyline]].map(([l, v]) => (
+              <div key={l}>
+                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-0.5">{l}</div>
+                <div className="text-[#f0ebe0] font-bold text-xs">{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-6 border-b border-[#2a2a2a] pb-0">
+        {tabs.map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            className={`px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px ${
+              activeTab === t ? 'text-[#f0ebe0] border-[#E21111]' : 'text-[#555] border-transparent hover:text-[#888]'
+            }`}>
+            {t === 'h2h' ? 'Head to Head' : t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'preview' && (
+        <div className="space-y-4">
+          {/* AI Analysis */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">AI Game Analysis</h3>
+              <span className="text-[9px] bg-[#E21111]/10 text-[#E21111] border border-[#E21111]/20 px-2 py-0.5 rounded-full font-black uppercase">AI</span>
+            </div>
+            <p className="text-[#888] text-sm leading-relaxed">{preview.aiAnalysis}</p>
+            <div className="mt-4 flex items-center gap-3 p-3 bg-[#2a2a2a]/50 rounded-xl">
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black text-lg">{preview.prediction.winner}</div>
+                <div className="text-[#555] text-[9px] uppercase font-bold">Predicted Winner</div>
+              </div>
+              <div className="w-px h-8 bg-[#3a3a3a]" />
+              <div className="text-center">
+                <div className="text-green-400 font-black text-lg">{preview.prediction.confidence}%</div>
+                <div className="text-[#555] text-[9px] uppercase font-bold">Confidence</div>
+              </div>
+              <div className="w-px h-8 bg-[#3a3a3a]" />
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black text-lg">{preview.prediction.spread}</div>
+                <div className="text-[#555] text-[9px] uppercase font-bold">Predicted Spread</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Factors */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Key Factors</h3>
+            </div>
+            <div className="space-y-3">
+              {preview.keyFactors.map((f, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${impactColor(f.impact)}`}>{f.impact}</span>
+                  <div className="flex-1">
+                    <div className="text-[#f0ebe0] text-xs font-bold">{f.label}</div>
+                    <div className="text-[#555] text-[10px]">{f.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Form + Injuries side by side */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Recent Form</h3>
+              </div>
+              {[['home', game.home], ['away', game.away]].map(([side, team]) => (
+                <div key={side} className="flex items-center justify-between mb-3 last:mb-0">
+                  <span className="text-[#888] text-xs font-bold w-12">{team.abbr}</span>
+                  <div className="flex items-center gap-1.5">
+                    {preview.recentForm[side].map((r, i) => (
+                      <span key={i} className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black ${r === 'W' ? 'bg-green-500/20 text-green-400' : 'bg-[#E21111]/20 text-[#E21111]'}`}>{r}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Injury Report</h3>
+              </div>
+              {preview.injuries.map((inj, i) => (
+                <div key={i} className="flex items-center gap-3 mb-3 last:mb-0">
+                  <span className="text-[9px] font-black uppercase bg-[#2a2a2a] px-2 py-0.5 rounded-full text-[#555] shrink-0">{inj.team}</span>
+                  <div className="flex-1">
+                    <div className="text-[#f0ebe0] text-xs font-bold">{inj.player}</div>
+                    <div className="text-[#555] text-[10px]">{inj.detail}</div>
+                  </div>
+                  <span className={`text-[9px] font-black uppercase shrink-0 ${inj.status === 'Questionable' ? 'text-yellow-400' : 'text-green-400'}`}>{inj.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Best Bet CTA */}
+          <Link to="/best-bets" className="flex items-center justify-between bg-gradient-to-r from-[#E21111]/10 to-transparent border border-[#E21111]/20 rounded-2xl p-5 hover:border-[#E21111]/40 transition-all group">
+            <div>
+              <div className="text-[#f0ebe0] font-black text-sm mb-0.5">View Best Bet for This Game</div>
+              <div className="text-[#555] text-xs">AI confidence pick with full analysis</div>
+            </div>
+            <ChevronRight size={20} className="text-[#E21111] group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
+      )}
+
+      {activeTab === 'odds' && (
+        <div className="space-y-4">
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Current Lines</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[['Spread', preview.odds.spread], ['Total', preview.odds.total], ['Moneyline', preview.odds.moneyline]].map(([label, val]) => (
+                <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-4 text-center">
+                  <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-2">{label}</div>
+                  <div className="text-[#f0ebe0] font-black text-base">{val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-[#1a1a1a] border border-[#E21111]/20 rounded-2xl p-5 flex items-center gap-4">
+            <div className="text-3xl">🎯</div>
+            <div>
+              <div className="text-[#f0ebe0] font-black text-sm mb-1">Our Best Pick for This Game</div>
+              <div className="text-[#888] text-xs">72% confidence · {game.home.abbr} -3.5 (-110)</div>
+            </div>
+            <Link to="/best-bets" className="ml-auto shrink-0 bg-[#E21111] text-white font-black uppercase text-[10px] px-4 py-2 rounded-xl tracking-widest hover:bg-red-700 transition-colors">
+              See Pick
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'starters' && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {[['away', game.away], ['home', game.home]].map(([side, team]) => (
+            <div key={side} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+              <div className="flex items-center gap-3 mb-4">
+                {team.logo && <img src={team.logo} alt={team.abbr} className="w-8 h-8 object-contain" />}
+                <div>
+                  <div className="text-[#f0ebe0] font-black text-sm">{team.name}</div>
+                  <div className="text-[#555] text-[10px]">{team.record}</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {preview.starters[side].map((p, i) => (
+                  <div key={i} className="flex items-center gap-3 py-2 border-b border-[#2a2a2a] last:border-0">
+                    <div className="w-5 h-5 rounded-full bg-[#2a2a2a] flex items-center justify-center text-[9px] font-black text-[#555]">{i + 1}</div>
+                    <span className="text-[#888] text-xs">{p}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'h2h' && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Head to Head — Recent Meetings</h3>
+          </div>
+          <div className="space-y-3">
+            {preview.h2h.map((g, i) => (
+              <div key={i} className="flex items-center justify-between py-3 border-b border-[#2a2a2a] last:border-0">
+                <span className="text-[#555] text-xs w-16">{g.date}</span>
+                <span className="text-[#f0ebe0] text-sm font-bold">{g.result}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── PLACEHOLDER PAGES ────────────────────────────────────────────────────────
 const ComingSoon = ({ title }) => (
   <div className="min-h-screen flex items-center justify-center">
@@ -969,7 +1337,7 @@ export default function App() {
             <Route path="/scores" element={<ScoresPage />} />
             <Route path="/best-bets" element={<BestBetsPage />} />
             <Route path="/league/:slug" element={<ComingSoon title="League Page" />} />
-            <Route path="/game/:league/:id" element={<ComingSoon title="Game Preview" />} />
+            <Route path="/game/:league/:id" element={<GamePreviewPage />} />
             <Route path="/team/:league/:id" element={<ComingSoon title="Team Page" />} />
             <Route path="/player/:id" element={<ComingSoon title="Player Profile" />} />
             <Route path="/login" element={<ComingSoon title="Sign In" />} />
