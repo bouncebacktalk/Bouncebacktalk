@@ -226,12 +226,30 @@ const fetchLeagueData = async (league) => {
 // Legacy shim — groupStandings no longer needed, kept to avoid call-site errors
 const groupStandings = () => [];
 
-const fetchTeamRoster = async (league, teamKey) => {
-  if (league === 'nhl') return [];
+const fetchTeamRoster = async (league, teamId) => {
+  const sportPath = ESPN_SPORT_PATH[league];
+  if (!sportPath) return [];
   try {
-    const res = await fetch(`${SPORTS_BASE}/${league}/scores/json/PlayersBasic/${teamKey.toUpperCase()}?key=${SPORTS_KEY}`);
+    const res = await fetch(
+      `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/teams/${teamId}/roster`
+    );
     const data = await res.json();
-    return Array.isArray(data) ? data.filter(p => p.Status === 'Active') : [];
+    // ESPN returns athletes as flat array OR grouped by position group ({items:[...]})
+    let raw = [];
+    if (Array.isArray(data.athletes)) {
+      raw = data.athletes[0]?.items
+        ? data.athletes.flatMap(g => g.items || [])
+        : data.athletes;
+    }
+    return raw.map(p => ({
+      PlayerID:   p.id,
+      FirstName:  p.firstName  || p.displayName?.split(' ')[0]            || '',
+      LastName:   p.lastName   || p.displayName?.split(' ').slice(1).join(' ') || '',
+      Jersey:     p.jersey     || null,
+      Position:   p.position?.abbreviation || '',
+      Experience: p.experience?.years       ?? null,
+      Headshot:   p.headshot?.href          || '',
+    }));
   } catch { return []; }
 };
 
@@ -2147,7 +2165,7 @@ const TeamPage = () => {
 
   // ── Lazy-load roster when tab first opened ─────────────────────────────────
   useEffect(() => {
-    if (activeTab !== 'roster' || rosterLoaded || league === 'nhl') return;
+    if (activeTab !== 'roster' || rosterLoaded) return;
     setRosterLoading(true);
     fetchTeamRoster(league, id)
       .then(data => { setRoster(data); setRosterLoaded(true); })
@@ -2365,11 +2383,7 @@ const TeamPage = () => {
                 Full Roster →
               </button>
             </div>
-            {league === 'nhl' ? (
-              <div className="text-[#555] text-xs text-center py-4">Roster data not available for NHL</div>
-            ) : (
-              <RosterPreview league={league} teamId={id} />
-            )}
+            <RosterPreview league={league} teamId={id} />
           </div>
 
         </div>
@@ -2466,13 +2480,7 @@ const TeamPage = () => {
       {/* ══ ROSTER ══ */}
       {activeTab === 'roster' && (
         <div className="space-y-4">
-          {league === 'nhl' ? (
-            <div className="text-center py-16 text-[#555]">
-              <div className="text-4xl mb-3">🏒</div>
-              <div className="font-black uppercase tracking-widest text-sm">NHL roster data not available</div>
-              <div className="text-xs mt-2 opacity-60">Live roster requires an NHL API subscription</div>
-            </div>
-          ) : rosterLoading ? (
+          {rosterLoading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <div className="w-7 h-7 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
               <div className="text-[#555] text-xs font-black uppercase tracking-widest">Loading roster...</div>
