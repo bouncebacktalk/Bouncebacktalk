@@ -583,6 +583,138 @@ const BottomNav = () => (
   </div>
 );
 
+// ─── SCORES PAGE ─────────────────────────────────────────────────────────────
+const ScoresPage = () => {
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeLeague, setActiveLeague] = useState('all');
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const load = () => {
+    fetchScores().then(g => {
+      setGames(g);
+      setLastUpdated(new Date());
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const tabs = [{ key: 'all', label: 'All' }, ...LEAGUES.map(l => ({ key: l.key, label: l.label }))];
+  const filtered = activeLeague === 'all' ? games : games.filter(g => g.league === activeLeague);
+  const live = filtered.filter(g => g.isLive);
+  const final = filtered.filter(g => g.isFinal);
+  const upcoming = filtered.filter(g => !g.isLive && !g.isFinal);
+
+  const GameCard = ({ g }) => (
+    <Link to={`/game/${g.league}/${g.id}`}
+      className="bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-2xl p-4 transition-all group block">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-2 py-0.5 rounded-full">{g.leagueLabel}</span>
+        {g.isLive
+          ? <span className="flex items-center gap-1.5 text-[#E21111] text-[10px] font-black uppercase">
+              <span className="w-2 h-2 rounded-full bg-[#E21111] animate-pulse" />{g.statusText}
+            </span>
+          : <span className="text-[#555] text-[10px] font-bold uppercase">{g.isFinal ? 'Final' : g.statusText}</span>
+        }
+      </div>
+      <div className="space-y-3">
+        {[g.away, g.home].map((team, ti) => (
+          <div key={ti} className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {team.logo
+                ? <img src={team.logo} alt={team.name} className="w-8 h-8 object-contain" />
+                : <div className="w-8 h-8 rounded-full bg-[#2a2a2a] flex items-center justify-center text-[10px] font-black text-[#555]">{team.name?.[0]}</div>
+              }
+              <span className="text-[#f0ebe0] font-bold text-sm">{team.name}</span>
+            </div>
+            <span className={`text-xl font-black tabular-nums ${g.isLive ? 'text-[#f0ebe0]' : 'text-[#666]'}`}>{team.score}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-[#2a2a2a] flex items-center justify-between">
+        <span className="text-[#555] text-[10px]">View Game Preview</span>
+        <ChevronRight size={12} className="text-[#333] group-hover:text-[#E21111] transition-colors" />
+      </div>
+    </Link>
+  );
+
+  const Section = ({ title, dot, games: list }) => list.length === 0 ? null : (
+    <div className="mb-8">
+      <div className="flex items-center gap-2 mb-4">
+        <span className={`w-2 h-2 rounded-full ${dot}`} />
+        <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">{title} <span className="text-[#555]">({list.length})</span></h3>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {list.map(g => <GameCard key={g.id} g={g} />)}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-black uppercase tracking-tight text-[#f0ebe0]">Scores</h1>
+          {lastUpdated && (
+            <p className="text-[#555] text-xs mt-1">
+              Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Auto-refreshes every 30s
+            </p>
+          )}
+        </div>
+        <button onClick={load} className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-[#888] hover:text-[#f0ebe0] text-xs font-bold uppercase tracking-wider transition-all hover:border-[#3a3a3a]">
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* League tabs */}
+      <div className="flex items-center gap-1 mb-8 overflow-x-auto pb-1 scrollbar-hide">
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setActiveLeague(t.key)}
+            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shrink-0 ${
+              activeLeague === t.key
+                ? 'bg-[#E21111] text-white'
+                : 'bg-[#1a1a1a] text-[#888] hover:text-[#f0ebe0] border border-[#2a2a2a]'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-[#1a1a1a] rounded-2xl p-4 animate-pulse">
+              <div className="h-3 bg-[#2a2a2a] rounded w-16 mb-4" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-[#2a2a2a]" /><div className="h-3 bg-[#2a2a2a] rounded w-20" /></div>
+                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-[#2a2a2a]" /><div className="h-3 bg-[#2a2a2a] rounded w-20" /></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20">
+          <div className="text-5xl mb-4">🏟️</div>
+          <h2 className="text-xl font-black uppercase text-[#f0ebe0] mb-2">No Games Today</h2>
+          <p className="text-[#555] text-sm">Check back later for live scores.</p>
+        </div>
+      ) : (
+        <>
+          <Section title="Live Now" dot="bg-[#E21111] animate-pulse" games={live} />
+          <Section title="Upcoming" dot="bg-[#555]" games={upcoming} />
+          <Section title="Final" dot="bg-green-500" games={final} />
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── PLACEHOLDER PAGES ────────────────────────────────────────────────────────
 const ComingSoon = ({ title }) => (
   <div className="min-h-screen flex items-center justify-center">
@@ -631,7 +763,7 @@ export default function App() {
         <main className="pb-20 lg:pb-0">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/scores" element={<ComingSoon title="Live Scores" />} />
+            <Route path="/scores" element={<ScoresPage />} />
             <Route path="/best-bets" element={<ComingSoon title="Best Bets" />} />
             <Route path="/league/:slug" element={<ComingSoon title="League Page" />} />
             <Route path="/game/:league/:id" element={<ComingSoon title="Game Preview" />} />
