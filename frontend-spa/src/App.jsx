@@ -58,6 +58,104 @@ const fetchScores = async () => {
   });
 };
 
+// ─── SPORTSDATA.IO API ────────────────────────────────────────────────────────
+const SPORTS_KEY = 'cd48920d0d784a2199d1ceefa5183f6b';
+const SPORTS_BASE = 'https://api.sportsdata.io/v3';
+
+// Some SportsData keys differ from ESPN CDN slugs
+const ESPN_SLUG = {
+  nba: { GSW: 'gs', NYK: 'ny', NOP: 'no', SAS: 'sa', WAS: 'wsh' },
+  nfl: { LAR: 'lar', GBP: 'gb', KCC: 'kc' },
+  mlb: { CWS: 'chw', SDP: 'sd', SFG: 'sf', KCR: 'kc', TBR: 'tb', WSN: 'was' },
+};
+const espnLogo = (league, key) => {
+  const slug = (ESPN_SLUG[league]?.[key] || key).toLowerCase();
+  return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
+};
+
+const normTeam = (league, t) => ({
+  id: t.Key.toLowerCase(),
+  name: `${t.City} ${t.Name}`,
+  abbr: t.Key,
+  logo: espnLogo(league, t.Key),
+  record: '—', conf: t.Conference || t.League || '', division: t.Division || '',
+  standing: '—', color: `#${t.PrimaryColor || '333'}`, headCoach: t.HeadCoach || '',
+});
+
+const ordinal = n => ['1st','2nd','3rd'][n-1] || `${n}th`;
+
+const mergeStandings = (teams, standings) => {
+  const map = {};
+  standings.forEach(s => { map[s.Key] = s; });
+  return teams.map(t => {
+    const s = map[t.abbr];
+    if (!s) return t;
+    const w = s.Wins ?? 0, l = s.Losses ?? 0;
+    const streak = s.StreakDescription || (s.Streak > 0 ? `W${s.Streak}` : s.Streak < 0 ? `L${Math.abs(s.Streak)}` : '');
+    const divRank = s.DivisionRank || s.LeagueRank || 0;
+    return { ...t,
+      record: `${w}-${l}`,
+      standing: divRank ? ordinal(divRank) : '—',
+      streak, wins: w, losses: l,
+      pct: s.Percentage ? s.Percentage.toFixed(3) : '—',
+      gb: s.GamesBack != null ? (s.GamesBack === 0 ? '—' : s.GamesBack) : '—',
+      ppg: s.PointsPerGameFor, oppPpg: s.PointsPerGameAgainst,
+    };
+  });
+};
+
+const fetchLeagueData = async (league) => {
+  if (league === 'nhl') return null; // no API access for NHL
+  const season = 2026;
+  const [teamsRes, standRes] = await Promise.allSettled([
+    fetch(`${SPORTS_BASE}/${league}/scores/json/AllTeams?key=${SPORTS_KEY}`).then(r => r.json()),
+    fetch(`${SPORTS_BASE}/${league}/scores/json/Standings/${season}?key=${SPORTS_KEY}`).then(r => r.json()),
+  ]);
+  let teams = [];
+  if (teamsRes.status === 'fulfilled' && Array.isArray(teamsRes.value)) {
+    teams = teamsRes.value
+      .filter(t => t.PrimaryColor && t.City && t.City.length > 3)
+      .map(t => normTeam(league, t))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  let rawStandings = [];
+  if (standRes.status === 'fulfilled' && Array.isArray(standRes.value) && standRes.value.length > 0) {
+    rawStandings = standRes.value;
+    teams = mergeStandings(teams, rawStandings);
+  }
+  return { teams, rawStandings };
+};
+
+// Group standings by division for display
+const groupStandings = (teams, rawStandings, league) => {
+  if (!rawStandings?.length) return [];
+  const map = {};
+  rawStandings.forEach(s => { map[s.Key] = s; });
+  const grouped = {};
+  teams.forEach(t => {
+    const s = map[t.abbr];
+    if (!s) return;
+    let groupKey = '';
+    if (league === 'nba') groupKey = s.Conference;
+    else if (league === 'nfl') groupKey = `${s.Conference} ${s.Division}`;
+    else groupKey = `${s.League} ${s.Division}`;
+    if (!grouped[groupKey]) grouped[groupKey] = [];
+    grouped[groupKey].push({ ...t, divRank: s.DivisionRank || s.LeagueRank || 99 });
+  });
+  return Object.entries(grouped)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([conf, ts]) => ({ conf, teams: ts.sort((a, b) => a.divRank - b.divRank) }));
+};
+
+const fetchTeamRoster = async (league, teamKey) => {
+  if (league === 'nhl') return [];
+  try {
+    const res = await fetch(`${SPORTS_BASE}/${league}/scores/json/Players/${teamKey.toUpperCase()}?key=${SPORTS_KEY}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data.filter(p => p.Status === 'Active') : [];
+  } catch { return []; }
+};
+
 // ─── TICKER ───────────────────────────────────────────────────────────────────
 const Ticker = ({ games }) => {
   const ref = useRef(null);
@@ -1287,6 +1385,51 @@ const GamePreviewPage = () => {
 };
 
 // ─── TEAM PAGE ───────────────────────────────────────────────────────────────
+// ─── NHL DATA (hardcoded — API key doesn't cover NHL) ────────────────────────
+const NHL_TEAMS = [
+  { id: 'bos', name: 'Boston Bruins', abbr: 'BOS', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/bos.png', record: '47-20-15', conf: 'Eastern', division: 'Atlantic', standing: '2nd', color: '#FFB81C', wins: 47, losses: 20, pct: '.698', gb: '5', streak: 'W2' },
+  { id: 'buf', name: 'Buffalo Sabres', abbr: 'BUF', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/buf.png', record: '38-35-9', conf: 'Eastern', division: 'Atlantic', standing: '5th', color: '#002654', wins: 38, losses: 35, pct: '.524', gb: '14', streak: 'L2' },
+  { id: 'det', name: 'Detroit Red Wings', abbr: 'DET', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/det.png', record: '35-38-9', conf: 'Eastern', division: 'Atlantic', standing: '7th', color: '#CE1126', wins: 35, losses: 38, pct: '.482', gb: '17', streak: 'L1' },
+  { id: 'fla', name: 'Florida Panthers', abbr: 'FLA', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/fla.png', record: '52-21-9', conf: 'Eastern', division: 'Atlantic', standing: '1st', color: '#C8102E', wins: 52, losses: 21, pct: '.704', gb: '—', streak: 'W3' },
+  { id: 'mtr', name: 'Montréal Canadiens', abbr: 'MTL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/mtr.png', record: '30-43-9', conf: 'Eastern', division: 'Atlantic', standing: '8th', color: '#AF1E2D', wins: 30, losses: 43, pct: '.421', gb: '22', streak: 'W1' },
+  { id: 'ott', name: 'Ottawa Senators', abbr: 'OTT', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/ott.png', record: '37-35-10', conf: 'Eastern', division: 'Atlantic', standing: '6th', color: '#C52032', wins: 37, losses: 35, pct: '.512', gb: '15', streak: 'W1' },
+  { id: 'tb', name: 'Tampa Bay Lightning', abbr: 'TB', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/tb.png', record: '46-28-8', conf: 'Eastern', division: 'Atlantic', standing: '3rd', color: '#002868', wins: 46, losses: 28, pct: '.610', gb: '6', streak: 'W1' },
+  { id: 'tor', name: 'Toronto Maple Leafs', abbr: 'TOR', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/tor.png', record: '44-30-8', conf: 'Eastern', division: 'Atlantic', standing: '4th', color: '#003E7E', wins: 44, losses: 30, pct: '.585', gb: '8', streak: 'L2' },
+  { id: 'car', name: 'Carolina Hurricanes', abbr: 'CAR', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/car.png', record: '50-24-8', conf: 'Eastern', division: 'Metropolitan', standing: '1st', color: '#CE1126', wins: 50, losses: 24, pct: '.659', gb: '—', streak: 'W2' },
+  { id: 'cbj', name: 'Columbus Blue Jackets', abbr: 'CBJ', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/cbj.png', record: '27-45-10', conf: 'Eastern', division: 'Metropolitan', standing: '8th', color: '#002654', wins: 27, losses: 45, pct: '.390', gb: '23', streak: 'L4' },
+  { id: 'nj', name: 'New Jersey Devils', abbr: 'NJD', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nj.png', record: '44-29-9', conf: 'Eastern', division: 'Metropolitan', standing: '2nd', color: '#CE1126', wins: 44, losses: 29, pct: '.585', gb: '6', streak: 'W3' },
+  { id: 'nyi', name: 'New York Islanders', abbr: 'NYI', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nyi.png', record: '36-35-11', conf: 'Eastern', division: 'Metropolitan', standing: '6th', color: '#00539B', wins: 36, losses: 35, pct: '.506', gb: '14', streak: 'W1' },
+  { id: 'nyr', name: 'New York Rangers', abbr: 'NYR', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nyr.png', record: '55-21-6', conf: 'Eastern', division: 'Metropolitan', standing: '1st', color: '#0038A8', wins: 55, losses: 21, pct: '.720', gb: '—', streak: 'W4' },
+  { id: 'phi', name: 'Philadelphia Flyers', abbr: 'PHI', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/phi.png', record: '33-38-11', conf: 'Eastern', division: 'Metropolitan', standing: '7th', color: '#F74902', wins: 33, losses: 38, pct: '.476', gb: '22', streak: 'L1' },
+  { id: 'pit', name: 'Pittsburgh Penguins', abbr: 'PIT', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/pit.png', record: '37-33-12', conf: 'Eastern', division: 'Metropolitan', standing: '5th', color: '#FCB514', wins: 37, losses: 33, pct: '.524', gb: '18', streak: 'W2' },
+  { id: 'wsh', name: 'Washington Capitals', abbr: 'WSH', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/wsh.png', record: '45-27-10', conf: 'Eastern', division: 'Metropolitan', standing: '3rd', color: '#C8102E', wins: 45, losses: 27, pct: '.610', gb: '10', streak: 'W1' },
+  { id: 'ari', name: 'Utah Hockey Club', abbr: 'UTA', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/ari.png', record: '36-38-8', conf: 'Western', division: 'Central', standing: '5th', color: '#69B3E7', wins: 36, losses: 38, pct: '.488', gb: '16', streak: 'L1' },
+  { id: 'chi', name: 'Chicago Blackhawks', abbr: 'CHI', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/chi.png', record: '23-50-9', conf: 'Western', division: 'Central', standing: '8th', color: '#CF0A2C', wins: 23, losses: 50, pct: '.335', gb: '29', streak: 'L3' },
+  { id: 'col', name: 'Colorado Avalanche', abbr: 'COL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/col.png', record: '50-23-9', conf: 'Western', division: 'Central', standing: '2nd', color: '#6F263D', wins: 50, losses: 23, pct: '.671', gb: '2', streak: 'W2' },
+  { id: 'dal', name: 'Dallas Stars', abbr: 'DAL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/dal.png', record: '52-22-8', conf: 'Western', division: 'Central', standing: '1st', color: '#006847', wins: 52, losses: 22, pct: '.695', gb: '—', streak: 'W5' },
+  { id: 'min', name: 'Minnesota Wild', abbr: 'MIN', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/min.png', record: '39-33-10', conf: 'Western', division: 'Central', standing: '4th', color: '#154734', wins: 39, losses: 33, pct: '.537', gb: '13', streak: 'W1' },
+  { id: 'nsh', name: 'Nashville Predators', abbr: 'NSH', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nsh.png', record: '32-40-10', conf: 'Western', division: 'Central', standing: '6th', color: '#FFB81C', wins: 32, losses: 40, pct: '.457', gb: '20', streak: 'L2' },
+  { id: 'stl', name: 'St. Louis Blues', abbr: 'STL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/stl.png', record: '42-31-9', conf: 'Western', division: 'Central', standing: '3rd', color: '#002F87', wins: 42, losses: 31, pct: '.567', gb: '10', streak: 'W1' },
+  { id: 'wpg', name: 'Winnipeg Jets', abbr: 'WPG', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/wpg.png', record: '52-24-6', conf: 'Western', division: 'Central', standing: '1st', color: '#041E42', wins: 52, losses: 24, pct: '.683', gb: '—', streak: 'W3' },
+  { id: 'ana', name: 'Anaheim Ducks', abbr: 'ANA', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/ana.png', record: '27-47-8', conf: 'Western', division: 'Pacific', standing: '7th', color: '#FC4C02', wins: 27, losses: 47, pct: '.378', gb: '25', streak: 'L2' },
+  { id: 'cgy', name: 'Calgary Flames', abbr: 'CGY', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/cgy.png', record: '38-35-9', conf: 'Western', division: 'Pacific', standing: '5th', color: '#C8102E', wins: 38, losses: 35, pct: '.524', gb: '14', streak: 'W1' },
+  { id: 'edm', name: 'Edmonton Oilers', abbr: 'EDM', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/edm.png', record: '49-27-6', conf: 'Western', division: 'Pacific', standing: '2nd', color: '#FF4C00', wins: 49, losses: 27, pct: '.634', gb: '3', streak: 'W6' },
+  { id: 'la', name: 'Los Angeles Kings', abbr: 'LAK', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/la.png', record: '44-30-8', conf: 'Western', division: 'Pacific', standing: '3rd', color: '#111111', wins: 44, losses: 30, pct: '.585', gb: '8', streak: 'W1' },
+  { id: 'sj', name: 'San Jose Sharks', abbr: 'SJS', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/sj.png', record: '19-55-8', conf: 'Western', division: 'Pacific', standing: '8th', color: '#006D75', wins: 19, losses: 55, pct: '.280', gb: '33', streak: 'L5' },
+  { id: 'sea', name: 'Seattle Kraken', abbr: 'SEA', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/sea.png', record: '34-41-7', conf: 'Western', division: 'Pacific', standing: '6th', color: '#001628', wins: 34, losses: 41, pct: '.463', gb: '18', streak: 'L1' },
+  { id: 'van', name: 'Vancouver Canucks', abbr: 'VAN', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/van.png', record: '50-25-7', conf: 'Western', division: 'Pacific', standing: '1st', color: '#001F5B', wins: 50, losses: 25, pct: '.659', gb: '—', streak: 'W2' },
+  { id: 'vgk', name: 'Vegas Golden Knights', abbr: 'VGK', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/vgk.png', record: '45-29-8', conf: 'Western', division: 'Pacific', standing: '4th', color: '#B4975A', wins: 45, losses: 29, pct: '.598', gb: '5', streak: 'L1' },
+];
+
+// For NHL: group by division for standings display
+const NHL_STANDINGS = ['Eastern - Atlantic','Eastern - Metropolitan','Western - Central','Western - Pacific'].map(key => {
+  const [conf, div] = key.split(' - ');
+  return { conf: `${conf} · ${div}`, teams: NHL_TEAMS.filter(t => t.conf === conf && t.division === div).sort((a,b) => a.wins < b.wins ? 1 : -1) };
+});
+
+// ─── (NBA / NFL / MLB teams loaded live from SportsData.io — see fetchLeagueData) ──
+
+// Legacy stub kept so old references don't crash during transition
 const TEAM_DATA = {
   nba: [
     { id: 'atl', name: 'Atlanta Hawks', abbr: 'ATL', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/atl.png', record: '36-46', conf: 'Eastern', standing: '9th', color: '#E03A3E' },
@@ -1422,6 +1565,8 @@ const TEAM_DATA = {
   ],
 };
 
+// LEAGUE_STANDINGS removed — NBA/NFL/MLB standings now fetched live from SportsData.io
+// NHL standings are in NHL_STANDINGS constant above
 const LEAGUE_STANDINGS = {
   nba: [
     { conf: 'Eastern', teams: [
@@ -1477,15 +1622,34 @@ const LEAGUE_STANDINGS = {
   ],
 };
 
-// League landing page — shows all teams + standings
+// League landing page — live data from SportsData.io (NHL uses hardcoded data)
 const LeaguePage = () => {
   const { slug } = useParams();
   const league = slug?.toLowerCase();
   const label = LEAGUES.find(l => l.key === league)?.label || league?.toUpperCase();
-  const teams = TEAM_DATA[league] || [];
-  const standings = LEAGUE_STANDINGS[league] || [];
   const [activeTab, setActiveTab] = useState('teams');
+  const [teams, setTeams] = useState([]);
+  const [standingGroups, setStandingGroups] = useState([]);
+  const [loading, setLoading] = useState(true);
   const emojis = { nba: '🏀', nfl: '🏈', mlb: '⚾', nhl: '🏒' };
+
+  useEffect(() => {
+    setLoading(true);
+    if (league === 'nhl') {
+      setTeams(NHL_TEAMS);
+      setStandingGroups(NHL_STANDINGS);
+      setLoading(false);
+      return;
+    }
+    fetchLeagueData(league)
+      .then(data => {
+        if (!data) return;
+        setTeams(data.teams);
+        setStandingGroups(groupStandings(data.teams, data.rawStandings, league));
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [league]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -1494,7 +1658,7 @@ const LeaguePage = () => {
         <span className="text-5xl">{emojis[league] || '🏆'}</span>
         <div>
           <h1 className="text-4xl font-black uppercase tracking-tight text-[#f0ebe0]">{label}</h1>
-          <p className="text-[#555] text-sm">Teams · Standings · Scores</p>
+          <p className="text-[#555] text-sm">Teams · Standings · Scores — Live Data</p>
         </div>
       </div>
 
@@ -1510,15 +1674,29 @@ const LeaguePage = () => {
         ))}
       </div>
 
-      {activeTab === 'teams' && (
+      {/* Loading */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <div className="w-8 h-8 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
+          <div className="text-[#555] text-xs font-black uppercase tracking-widest">Loading {label} data...</div>
+        </div>
+      )}
+
+      {/* Teams grid */}
+      {!loading && activeTab === 'teams' && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {teams.map(team => (
             <Link key={team.id} to={`/team/${league}/${team.id}`}
               className="bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-2xl p-4 flex items-center gap-4 transition-all group hover:-translate-y-0.5">
-              <img src={team.logo} alt={team.abbr} className="w-12 h-12 object-contain shrink-0" onError={e => { e.target.style.display='none'; }} />
+              <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                <img src={team.logo} alt={team.abbr} className="w-12 h-12 object-contain"
+                  onError={e => { e.target.style.display='none'; }} />
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[#f0ebe0] font-black text-sm truncate">{team.name}</div>
-                <div className="text-[#555] text-[10px] mt-0.5">{team.conf} · {team.standing} · {team.record}</div>
+                <div className="text-[#555] text-[10px] mt-0.5">
+                  {[team.division || team.conf, team.standing !== '—' && team.standing, team.record].filter(Boolean).join(' · ')}
+                </div>
               </div>
               <ChevronRight size={14} className="text-[#333] group-hover:text-[#E21111] transition-colors shrink-0" />
             </Link>
@@ -1526,9 +1704,16 @@ const LeaguePage = () => {
         </div>
       )}
 
-      {activeTab === 'standings' && (
+      {/* Standings */}
+      {!loading && activeTab === 'standings' && (
         <div className="space-y-6">
-          {standings.map(div => (
+          {standingGroups.length === 0 ? (
+            <div className="text-center py-20 text-[#555]">
+              <div className="text-5xl mb-4">📋</div>
+              <div className="font-black uppercase tracking-widest text-sm">Standings not available</div>
+              <div className="text-xs mt-2 opacity-60">Season may not have started yet</div>
+            </div>
+          ) : standingGroups.map(div => (
             <div key={div.conf}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-5 bg-[#E21111] rounded-full" />
@@ -1540,15 +1725,17 @@ const LeaguePage = () => {
                   <span className="text-center">PCT</span><span className="text-center">GB</span><span className="text-center">STK</span>
                 </div>
                 {div.teams.map((t, i) => (
-                  <Link key={t.abbr} to={`/team/${league}/${t.abbr.toLowerCase()}`}
+                  <Link key={t.abbr || i} to={`/team/${league}/${t.id || t.abbr?.toLowerCase()}`}
                     className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem_3rem_3rem] gap-2 px-4 py-3 border-b border-[#2a2a2a] last:border-0 hover:bg-white/5 transition-colors items-center">
-                    <span className="text-[#555] text-xs font-black">{t.pos}</span>
+                    <span className="text-[#555] text-xs font-black">{i + 1}</span>
                     <span className="text-[#f0ebe0] text-xs font-bold truncate">{t.name}</span>
-                    <span className="text-[#f0ebe0] text-xs font-black text-center">{t.w}</span>
-                    <span className="text-[#888] text-xs text-center">{t.l}</span>
-                    <span className="text-[#888] text-xs text-center">{t.pct}</span>
-                    <span className="text-[#555] text-xs text-center">{t.gb}</span>
-                    <span className={`text-[10px] font-black text-center ${t.streak.startsWith('W') ? 'text-green-400' : 'text-[#E21111]'}`}>{t.streak}</span>
+                    <span className="text-[#f0ebe0] text-xs font-black text-center">{t.wins ?? '—'}</span>
+                    <span className="text-[#888] text-xs text-center">{t.losses ?? '—'}</span>
+                    <span className="text-[#888] text-xs text-center">{t.pct ?? '—'}</span>
+                    <span className="text-[#555] text-xs text-center">{t.gb ?? '—'}</span>
+                    <span className={`text-[10px] font-black text-center ${(t.streak || '').startsWith('W') ? 'text-green-400' : 'text-[#E21111]'}`}>
+                      {t.streak || '—'}
+                    </span>
                   </Link>
                 ))}
               </div>
