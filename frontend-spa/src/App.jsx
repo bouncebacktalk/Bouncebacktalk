@@ -1427,10 +1427,10 @@ const NHL_STANDINGS = ['Eastern - Atlantic','Eastern - Metropolitan','Western - 
   return { conf: `${conf} · ${div}`, teams: NHL_TEAMS.filter(t => t.conf === conf && t.division === div).sort((a,b) => a.wins < b.wins ? 1 : -1) };
 });
 
-// ─── (NBA / NFL / MLB teams loaded live from SportsData.io — see fetchLeagueData) ──
-
-// Legacy stub kept so old references don't crash during transition
-const TEAM_DATA = {
+// ─── TEAM_DATA removed — all teams now loaded live via fetchLeagueData ──────────
+// NHL teams still use the NHL_TEAMS constant above
+// eslint-disable-next-line no-unused-vars
+const _TEAM_DATA_REMOVED = {
   nba: [
     { id: 'atl', name: 'Atlanta Hawks', abbr: 'ATL', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/atl.png', record: '36-46', conf: 'Eastern', standing: '9th', color: '#E03A3E' },
     { id: 'bos', name: 'Boston Celtics', abbr: 'BOS', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/bos.png', record: '61-21', conf: 'Eastern', standing: '1st', color: '#007A33' },
@@ -1748,98 +1748,242 @@ const LeaguePage = () => {
 };
 
 // Individual team page
+// ── per-sport helpers ──────────────────────────────────────────────────────────
+const POS_COLOR = pos => {
+  if (!pos) return 'text-[#555]';
+  if (['QB','PG','SP','GK'].includes(pos)) return 'text-blue-400';
+  if (['WR','SG','CF','LF','RF'].includes(pos)) return 'text-green-400';
+  if (['TE','PF','C','1B','2B','3B','SS'].includes(pos)) return 'text-yellow-400';
+  if (['RP','P','DH'].includes(pos)) return 'text-purple-400';
+  return 'text-[#888]';
+};
+
+const playerStat = (league, p) => {
+  if (league === 'nba') {
+    const pts = p.PointsPerGame != null ? p.PointsPerGame.toFixed(1) : null;
+    const reb = p.ReboundsPerGame != null ? p.ReboundsPerGame.toFixed(1) : null;
+    const ast = p.AssistsPerGame != null ? p.AssistsPerGame.toFixed(1) : null;
+    if (pts) return `${pts} PPG · ${reb ?? '—'} REB · ${ast ?? '—'} AST`;
+  }
+  if (league === 'mlb') {
+    const isPitcher = ['SP','RP','P'].includes(p.Position);
+    if (isPitcher && p.EarnedRunAverage != null) return `${p.EarnedRunAverage.toFixed(2)} ERA`;
+    if (!isPitcher && p.BattingAverage != null) {
+      const avg = `.${String(Math.round(p.BattingAverage * 1000)).padStart(3, '0')}`;
+      return `${avg} AVG${p.HomeRuns != null ? ` · ${p.HomeRuns} HR` : ''}`;
+    }
+  }
+  if (league === 'nfl') {
+    if (p.Position === 'QB' && p.PassingYards != null) return `${p.PassingYards} PASS YDS`;
+    if (['RB','FB'].includes(p.Position) && p.RushingYards != null) return `${p.RushingYards} RUSH YDS`;
+    if (['WR','TE'].includes(p.Position) && p.ReceivingYards != null) return `${p.ReceivingYards} REC YDS`;
+  }
+  return null;
+};
+
+const fetchTeamSchedule = async (league, teamKey) => {
+  if (league === 'nhl') return [];
+  try {
+    const season = league === 'nfl' ? '2026REG' : '2026';
+    const res = await fetch(`${SPORTS_BASE}/${league}/scores/json/GamesByTeam/${season}/${teamKey.toUpperCase()}?key=${SPORTS_KEY}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data;
+  } catch { return []; }
+};
+
 const TeamPage = () => {
   const { league, id } = useParams();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [games, setGames] = useState([]);
-
   const leagueObj = LEAGUES.find(l => l.key === league);
-  const allTeams = TEAM_DATA[league] || [];
-  const team = allTeams.find(t => t.id === id) || allTeams[0];
 
+  const [team, setTeam]           = useState(null);
+  const [teamLoading, setTeamLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [todayGames, setTodayGames] = useState([]);
+
+  // Roster state
+  const [roster, setRoster]             = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterLoaded, setRosterLoaded]   = useState(false);
+  const [rosterFilter, setRosterFilter]   = useState('ALL');
+
+  // Schedule state
+  const [schedule, setSchedule]         = useState([]);
+  const [schedLoading, setSchedLoading] = useState(false);
+  const [schedLoaded, setSchedLoaded]   = useState(false);
+
+  // ── Load team info ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!leagueObj) return;
-    fetchScores().then(all => setGames(all.filter(g => g.league === league))).catch(() => {});
+    setTeamLoading(true);
+    if (league === 'nhl') {
+      const found = NHL_TEAMS.find(t => t.id === id);
+      setTeam(found || null);
+      setTeamLoading(false);
+      return;
+    }
+    fetchLeagueData(league)
+      .then(data => {
+        if (!data) return;
+        setTeam(data.teams.find(t => t.id === id) || null);
+      })
+      .catch(() => {})
+      .finally(() => setTeamLoading(false));
+  }, [league, id]);
+
+  // ── Today's ESPN scores for "game banner" ──────────────────────────────────
+  useEffect(() => {
+    fetchScores().then(all => setTodayGames(all.filter(g => g.league === league))).catch(() => {});
   }, [league]);
 
+  // ── Lazy-load roster when tab first opened ─────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'roster' || rosterLoaded || league === 'nhl') return;
+    setRosterLoading(true);
+    fetchTeamRoster(league, id)
+      .then(data => { setRoster(data); setRosterLoaded(true); })
+      .catch(() => {})
+      .finally(() => setRosterLoading(false));
+  }, [activeTab, league, id, rosterLoaded]);
+
+  // ── Lazy-load schedule when tab first opened ───────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'schedule' || schedLoaded) return;
+    setSchedLoading(true);
+    fetchTeamSchedule(league, id)
+      .then(data => { setSchedule(data); setSchedLoaded(true); })
+      .catch(() => {})
+      .finally(() => setSchedLoading(false));
+  }, [activeTab, league, id, schedLoaded]);
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const todayGame = todayGames.find(g =>
+    g.home.name === team?.abbr || g.away.name === team?.abbr
+  );
+
+  const overviewStats = !team ? [] : (() => {
+    const base = [
+      ['Record',  team.record  || '—'],
+      ['Standing',team.standing|| '—'],
+      ['W%',      team.pct     || '—'],
+      ['Streak',  team.streak  || '—'],
+    ];
+    const scored  = team.ppg    != null ? team.ppg.toFixed(1)    : '—';
+    const allowed = team.oppPpg != null ? team.oppPpg.toFixed(1) : '—';
+    if (league === 'mlb') return [...base, ['R/G', scored], ['Opp R/G', allowed]];
+    if (league === 'nhl') return [...base, ['GF/G', scored], ['GA/G',   allowed]];
+    if (league === 'nfl') return [...base, ['PTS/G', scored], ['Opp PTS', allowed]];
+    return [...base, ['PPG', scored], ['OPP PPG', allowed]];
+  })();
+
+  const recentForm = (() => {
+    if (!team?.streak) return [];
+    const s = team.streak;
+    if (!s || s === '—') return [];
+    const dir = s[0]; const n = parseInt(s.slice(1)) || 0;
+    return Array.from({ length: Math.min(n, 5) }, () => dir)
+      .concat(Array.from({ length: Math.max(0, 5 - n) }, () => dir === 'W' ? 'L' : 'W'))
+      .slice(0, 5);
+  })();
+
+  // Roster position groups
+  const posGroups = (() => {
+    if (!roster.length) return [];
+    const all = [...new Set(roster.map(p => p.Position).filter(Boolean))].sort();
+    return ['ALL', ...all];
+  })();
+
+  const filteredRoster = rosterFilter === 'ALL'
+    ? roster
+    : roster.filter(p => p.Position === rosterFilter);
+
+  // Schedule display helpers
+  const fmtDate = d => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+  const completed = schedule.filter(g => g.Status === 'Final' || g.Status === 'F').slice(-8);
+  const upcoming  = schedule.filter(g => g.Status === 'Scheduled').slice(0, 8);
+
+  // ── Loading / not-found states ─────────────────────────────────────────────
+  if (teamLoading) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+      <div className="w-8 h-8 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
+      <div className="text-[#555] text-xs font-black uppercase tracking-widest">Loading team...</div>
+    </div>
+  );
+
   if (!team) return (
-    <div className="min-h-screen flex items-center justify-center text-center">
+    <div className="min-h-[60vh] flex items-center justify-center text-center px-4">
       <div>
         <div className="text-5xl mb-4">🏟️</div>
         <h2 className="text-2xl font-black uppercase text-[#f0ebe0] mb-3">Team Not Found</h2>
-        <Link to={`/league/${league}`} className="text-[#E21111] font-bold text-sm hover:underline">← Back to {leagueObj?.label}</Link>
+        <Link to={`/league/${league}`} className="text-[#E21111] font-bold text-sm hover:underline">
+          ← Back to {leagueObj?.label}
+        </Link>
       </div>
     </div>
   );
 
-  const schedule = [
-    { date: 'Jun 6', opponent: 'vs MIL', result: 'W 118-104', home: true },
-    { date: 'Jun 4', opponent: '@ BOS', result: 'L 98-112', home: false },
-    { date: 'Jun 2', opponent: 'vs PHX', result: 'W 126-115', home: true },
-    { date: 'May 31', opponent: '@ DEN', result: 'W 109-107', home: false },
-    { date: 'May 29', opponent: 'vs LAL', result: 'W 122-110', home: true },
-    { date: 'Jun 10', opponent: 'vs IND', result: 'TBD', home: true, upcoming: true },
-    { date: 'Jun 12', opponent: '@ BOS', result: 'TBD', home: false, upcoming: true },
-    { date: 'Jun 15', opponent: 'vs MIL', result: 'TBD', home: true, upcoming: true },
-  ];
-
-  const injuries = [
-    { player: 'J. Haliburton', pos: 'PG', status: 'Questionable', detail: 'Hamstring', updated: 'Today' },
-    { player: 'M. Bridges', pos: 'SF', status: 'Probable', detail: 'Ankle', updated: 'Yesterday' },
-    { player: 'I. Hartenstein', pos: 'C', status: 'Out', detail: 'Back spasms', updated: '2 days ago' },
-  ];
-
-  const stats = league === 'nba'
-    ? [['PPG', '118.4'], ['OPP PPG', '110.2'], ['REB', '44.1'], ['AST', '26.8'], ['FG%', '47.2%'], ['3P%', '36.8%']]
-    : league === 'nfl'
-    ? [['PTS/G', '27.4'], ['OPP PTS', '19.8'], ['YDS/G', '384'], ['RUSH YDS', '142'], ['PASS YDS', '242'], ['SACKS', '42']]
-    : league === 'mlb'
-    ? [['AVG', '.268'], ['ERA', '3.42'], ['HR', '84'], ['RBI', '312'], ['OBP', '.338'], ['WHIP', '1.18']]
-    : [['GF', '3.4'], ['GA', '2.8'], ['PP%', '22.4%'], ['PK%', '81.2%'], ['SV%', '.912'], ['SO', '34']];
-
-  const recentForm = ['W', 'W', 'L', 'W', 'W'];
-
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-[#555] text-xs mb-6">
         <Link to="/" className="hover:text-[#f0ebe0]">Home</Link>
         <span>/</span>
         <Link to={`/league/${league}`} className="hover:text-[#f0ebe0]">{leagueObj?.label}</Link>
         <span>/</span>
-        <span className="text-[#888]">{team.abbr}</span>
+        <span className="text-[#888]">{team.name}</span>
       </div>
 
-      {/* Team hero */}
+      {/* ── Team Hero ── */}
       <div className="relative rounded-2xl overflow-hidden mb-6 bg-[#1a1a1a] border border-[#2a2a2a]">
-        <div className="absolute inset-0 opacity-10" style={{ background: `linear-gradient(135deg, ${team.color}, transparent)` }} />
+        <div className="absolute inset-0 opacity-[0.08]"
+          style={{ background: `linear-gradient(135deg, ${team.color || '#E21111'}, transparent)` }} />
         <div className="relative p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6">
-          <img src={team.logo} alt={team.name} className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-2xl shrink-0"
-            onError={e => { e.target.style.display='none'; }} />
+          <img src={team.logo} alt={team.name}
+            className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-2xl shrink-0"
+            onError={e => { e.target.style.display = 'none'; }} />
+
           <div className="flex-1 text-center md:text-left">
-            <div className="text-[#555] text-[10px] font-black uppercase tracking-widest mb-1">{leagueObj?.label} · {team.conf}</div>
-            <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tight text-[#f0ebe0] mb-2">{team.name}</h1>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-3">
-              <div className="text-center">
-                <div className="text-[#f0ebe0] font-black text-xl">{team.record}</div>
-                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Record</div>
-              </div>
-              <div className="w-px h-8 bg-[#2a2a2a]" />
-              <div className="text-center">
-                <div className="text-[#f0ebe0] font-black text-xl">{team.standing}</div>
-                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Conf. Standing</div>
-              </div>
-              <div className="w-px h-8 bg-[#2a2a2a]" />
-              <div className="flex items-center gap-1.5">
-                {recentForm.map((r, i) => (
-                  <span key={i} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ${r === 'W' ? 'bg-green-500/20 text-green-400' : 'bg-[#E21111]/20 text-[#E21111]'}`}>{r}</span>
-                ))}
-                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest ml-1">Last 5</div>
-              </div>
+            <div className="text-[#555] text-[10px] font-black uppercase tracking-widest mb-1">
+              {leagueObj?.label}{team.conf ? ` · ${team.conf}` : ''}{team.division ? ` · ${team.division}` : ''}
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tight text-[#f0ebe0] mb-3">{team.name}</h1>
+
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
+              {team.record !== '—' && (
+                <>
+                  <div className="text-center">
+                    <div className="text-[#f0ebe0] font-black text-xl">{team.record}</div>
+                    <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Record</div>
+                  </div>
+                  <div className="w-px h-8 bg-[#2a2a2a]" />
+                </>
+              )}
+              {team.standing !== '—' && (
+                <>
+                  <div className="text-center">
+                    <div className="text-[#f0ebe0] font-black text-xl">{team.standing}</div>
+                    <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Div. Rank</div>
+                  </div>
+                  <div className="w-px h-8 bg-[#2a2a2a]" />
+                </>
+              )}
+              {recentForm.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  {recentForm.map((r, i) => (
+                    <span key={i} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black
+                      ${r === 'W' ? 'bg-green-500/20 text-green-400' : 'bg-[#E21111]/20 text-[#E21111]'}`}>{r}</span>
+                  ))}
+                  <div className="text-[#555] text-[9px] font-black uppercase tracking-widest ml-1">Streak</div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Follow button */}
           <Link to="/register"
             className="shrink-0 flex items-center gap-2 bg-[#E21111] hover:bg-red-700 text-white font-black uppercase text-xs px-5 py-2.5 rounded-xl tracking-widest transition-colors">
             <BellIcon size={13} /> Follow
@@ -1847,127 +1991,638 @@ const TeamPage = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       <div className="flex items-center gap-1 mb-6 border-b border-[#2a2a2a]">
-        {['overview', 'schedule', 'injuries'].map(t => (
+        {['overview', 'schedule', 'roster'].map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
-            className={`px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px ${
-              activeTab === t ? 'text-[#f0ebe0] border-[#E21111]' : 'text-[#555] border-transparent hover:text-[#888]'
-            }`}>
+            className={`px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px
+              ${activeTab === t ? 'text-[#f0ebe0] border-[#E21111]' : 'text-[#555] border-transparent hover:text-[#888]'}`}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
 
+      {/* ══ OVERVIEW ══ */}
       {activeTab === 'overview' && (
         <div className="space-y-4">
-          {/* Season Stats */}
-          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-5 bg-[#E21111] rounded-full" />
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Season Stats</h3>
-            </div>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-              {stats.map(([label, val]) => (
-                <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-3 text-center">
-                  <div className="text-[#f0ebe0] font-black text-lg">{val}</div>
-                  <div className="text-[#555] text-[9px] font-black uppercase tracking-wider">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Today's game if any */}
-          {games.filter(g => g.home.name === team.abbr || g.away.name === team.abbr).slice(0, 1).map(g => (
-            <Link key={g.id} to={`/game/${g.league}/${g.id}`}
+          {/* Season stats grid */}
+          {overviewStats.length > 0 && (
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Season Stats</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                {overviewStats.map(([label, val]) => (
+                  <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-3 text-center">
+                    <div className="text-[#f0ebe0] font-black text-lg">{val}</div>
+                    <div className="text-[#555] text-[9px] font-black uppercase tracking-wider">{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Today's game banner */}
+          {todayGame && (
+            <Link to={`/game/${league}/${todayGame.id}`}
               className="flex items-center gap-4 bg-gradient-to-r from-[#E21111]/10 to-transparent border border-[#E21111]/20 rounded-2xl p-5 hover:border-[#E21111]/40 transition-all group">
               <div className="text-3xl">🏟️</div>
               <div className="flex-1">
                 <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-0.5">
-                  {g.isLive ? '🔴 LIVE NOW' : g.isFinal ? 'FINAL' : 'TODAY'}
+                  {todayGame.isLive ? '🔴 LIVE NOW' : todayGame.isFinal ? 'FINAL · TODAY' : 'GAME TODAY'}
                 </div>
-                <div className="text-[#f0ebe0] font-black text-sm">{g.away.name} vs {g.home.name}</div>
-                {(g.isLive || g.isFinal) && (
-                  <div className="text-[#888] text-xs">{g.away.score} – {g.home.score} · {g.statusText}</div>
+                <div className="text-[#f0ebe0] font-black text-sm">
+                  {todayGame.away.name} {(todayGame.isLive || todayGame.isFinal) ? todayGame.away.score : ''} @ {todayGame.home.name} {(todayGame.isLive || todayGame.isFinal) ? todayGame.home.score : ''}
+                </div>
+                {todayGame.statusText && (
+                  <div className="text-[#888] text-xs mt-0.5">{todayGame.statusText}</div>
                 )}
               </div>
               <ChevronRight size={18} className="text-[#E21111] group-hover:translate-x-1 transition-transform" />
             </Link>
-          ))}
+          )}
 
-          {/* Next upcoming game */}
+          {/* Quick roster preview — top 6 players */}
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-5 bg-[#E21111] rounded-full" />
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Upcoming</h3>
-            </div>
-            {schedule.filter(s => s.upcoming).slice(0, 3).map((s, i) => (
-              <div key={i} className="flex items-center justify-between py-2.5 border-b border-[#2a2a2a] last:border-0">
-                <div className="flex items-center gap-3">
-                  <span className="text-[#555] text-xs w-12">{s.date}</span>
-                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${s.home ? 'bg-[#2a2a2a] text-[#888]' : 'text-[#555]'}`}>{s.home ? 'HOME' : 'AWAY'}</span>
-                  <span className="text-[#f0ebe0] text-xs font-bold">{s.opponent}</span>
-                </div>
-                <span className="text-[#555] text-xs">TBD</span>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Key Players</h3>
               </div>
-            ))}
+              <button onClick={() => setActiveTab('roster')}
+                className="text-[10px] font-black uppercase tracking-widest text-[#E21111] hover:text-red-400 transition-colors">
+                Full Roster →
+              </button>
+            </div>
+            {league === 'nhl' ? (
+              <div className="text-[#555] text-xs text-center py-4">Roster data not available for NHL</div>
+            ) : (
+              <RosterPreview league={league} teamId={id} />
+            )}
           </div>
+
         </div>
       )}
 
+      {/* ══ SCHEDULE ══ */}
       {activeTab === 'schedule' && (
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-[3rem_4rem_1fr_5rem] gap-4 px-5 py-3 border-b border-[#2a2a2a] text-[9px] font-black uppercase tracking-widest text-[#444]">
-            <span>Date</span><span>H/A</span><span>Opponent</span><span>Result</span>
-          </div>
-          {schedule.map((s, i) => (
-            <div key={i} className={`grid grid-cols-[3rem_4rem_1fr_5rem] gap-4 px-5 py-3.5 border-b border-[#2a2a2a] last:border-0 items-center ${s.upcoming ? 'opacity-60' : ''}`}>
-              <span className="text-[#555] text-xs">{s.date}</span>
-              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-center ${s.home ? 'bg-[#2a2a2a] text-[#888]' : 'text-[#555]'}`}>{s.home ? 'Home' : 'Away'}</span>
-              <span className="text-[#f0ebe0] text-xs font-bold">{s.opponent}</span>
-              <span className={`text-xs font-black ${s.result.startsWith('W') ? 'text-green-400' : s.result.startsWith('L') ? 'text-[#E21111]' : 'text-[#555]'}`}>{s.result}</span>
+        <div className="space-y-4">
+          {schedLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-7 h-7 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
+              <div className="text-[#555] text-xs font-black uppercase tracking-widest">Loading schedule...</div>
             </div>
-          ))}
+          ) : (
+            <>
+              {completed.length > 0 && (
+                <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#2a2a2a]">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-[#E21111] rounded-full" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#888]">Recent Results</span>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[#2a2a2a]">
+                    {completed.map((g, i) => {
+                      const isHome   = g.HomeTeam === id.toUpperCase();
+                      const oppKey   = isHome ? g.AwayTeam : g.HomeTeam;
+                      const myScore  = isHome ? g.HomeTeamScore : g.AwayTeamScore;
+                      const oppScore = isHome ? g.AwayTeamScore : g.HomeTeamScore;
+                      const won      = myScore > oppScore;
+                      return (
+                        <div key={g.GameID || i} className="grid grid-cols-[4rem_3rem_1fr_6rem] gap-3 px-5 py-3.5 items-center hover:bg-white/5 transition-colors">
+                          <span className="text-[#555] text-xs">{fmtDate(g.DateTime || g.Day)}</span>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-center ${isHome ? 'bg-[#2a2a2a] text-[#888]' : 'text-[#555]'}`}>
+                            {isHome ? 'HOME' : 'AWAY'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <img src={espnLogo(league, oppKey)} alt={oppKey}
+                              className="w-5 h-5 object-contain" onError={e => { e.target.style.display='none'; }} />
+                            <span className="text-[#f0ebe0] text-xs font-bold">{oppKey}</span>
+                          </div>
+                          <span className={`text-xs font-black ${won ? 'text-green-400' : 'text-[#E21111]'}`}>
+                            {won ? 'W' : 'L'} {myScore}–{oppScore}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {upcoming.length > 0 && (
+                <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#2a2a2a]">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-[#E21111] rounded-full" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#888]">Upcoming</span>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[#2a2a2a]">
+                    {upcoming.map((g, i) => {
+                      const isHome = g.HomeTeam === id.toUpperCase();
+                      const oppKey = isHome ? g.AwayTeam : g.HomeTeam;
+                      return (
+                        <div key={g.GameID || i} className="grid grid-cols-[4rem_3rem_1fr_6rem] gap-3 px-5 py-3.5 items-center opacity-70">
+                          <span className="text-[#555] text-xs">{fmtDate(g.DateTime || g.Day)}</span>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-center ${isHome ? 'bg-[#2a2a2a] text-[#888]' : 'text-[#555]'}`}>
+                            {isHome ? 'HOME' : 'AWAY'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <img src={espnLogo(league, oppKey)} alt={oppKey}
+                              className="w-5 h-5 object-contain" onError={e => { e.target.style.display='none'; }} />
+                            <span className="text-[#f0ebe0] text-xs font-bold">{oppKey}</span>
+                          </div>
+                          <span className="text-[#555] text-xs">TBD</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!schedLoading && completed.length === 0 && upcoming.length === 0 && (
+                <div className="text-center py-16 text-[#555]">
+                  <div className="text-4xl mb-3">📅</div>
+                  <div className="font-black uppercase tracking-widest text-sm">No schedule data available</div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
-      {activeTab === 'injuries' && (
-        <div className="space-y-3">
-          {injuries.length === 0 ? (
-            <div className="text-center py-12 text-[#555]">No injury reports available.</div>
-          ) : injuries.map((inj, i) => (
-            <div key={i} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-[#2a2a2a] flex items-center justify-center text-[11px] font-black text-[#888] shrink-0">{inj.pos}</div>
-              <div className="flex-1">
-                <div className="text-[#f0ebe0] font-black text-sm">{inj.player}</div>
-                <div className="text-[#555] text-xs">{inj.detail} · Updated {inj.updated}</div>
-              </div>
-              <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${
-                inj.status === 'Out' ? 'text-[#E21111] bg-[#E21111]/10 border-[#E21111]/20'
-                : inj.status === 'Questionable' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20'
-                : 'text-green-400 bg-green-400/10 border-green-400/20'
-              }`}>{inj.status}</span>
+      {/* ══ ROSTER ══ */}
+      {activeTab === 'roster' && (
+        <div className="space-y-4">
+          {league === 'nhl' ? (
+            <div className="text-center py-16 text-[#555]">
+              <div className="text-4xl mb-3">🏒</div>
+              <div className="font-black uppercase tracking-widest text-sm">NHL roster data not available</div>
+              <div className="text-xs mt-2 opacity-60">Live roster requires an NHL API subscription</div>
             </div>
-          ))}
+          ) : rosterLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-7 h-7 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
+              <div className="text-[#555] text-xs font-black uppercase tracking-widest">Loading roster...</div>
+            </div>
+          ) : roster.length === 0 ? (
+            <div className="text-center py-16 text-[#555]">
+              <div className="text-4xl mb-3">👤</div>
+              <div className="font-black uppercase tracking-widest text-sm">No roster data available</div>
+            </div>
+          ) : (
+            <>
+              {/* Position filter pills */}
+              {posGroups.length > 2 && (
+                <div className="flex flex-wrap gap-2">
+                  {posGroups.map(pos => (
+                    <button key={pos} onClick={() => setRosterFilter(pos)}
+                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-all
+                        ${rosterFilter === pos
+                          ? 'bg-[#E21111] text-white'
+                          : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#555] hover:text-[#888]'}`}>
+                      {pos}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Player list */}
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+                <div className="grid grid-cols-[2rem_1fr_3rem_1fr] gap-4 px-5 py-2.5 border-b border-[#2a2a2a] text-[9px] font-black uppercase tracking-widest text-[#444]">
+                  <span>#</span><span>Player</span><span>Pos</span><span>Stats</span>
+                </div>
+                <div className="divide-y divide-[#2a2a2a]">
+                  {filteredRoster.map((p, i) => {
+                    const statLine = playerStat(league, p);
+                    const name = `${p.FirstName || ''} ${p.LastName || ''}`.trim();
+                    return (
+                      <div key={p.PlayerID || i}
+                        className="grid grid-cols-[2rem_1fr_3rem_1fr] gap-4 px-5 py-3 items-center hover:bg-white/5 transition-colors">
+                        <span className="text-[#444] text-xs font-black">{p.Jersey || '—'}</span>
+                        <span className="text-[#f0ebe0] text-sm font-bold truncate">{name}</span>
+                        <span className={`text-[10px] font-black ${POS_COLOR(p.Position)}`}>{p.Position || '—'}</span>
+                        <span className="text-[#555] text-xs">{statLine || (p.Experience != null ? `${p.Experience}Y exp` : '—')}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-// ─── PLACEHOLDER PAGES ────────────────────────────────────────────────────────
-const ComingSoon = ({ title }) => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="text-center">
-      <div className="text-[#E21111] text-6xl font-black mb-4">BBT</div>
-      <h1 className="text-3xl font-black uppercase text-[#f0ebe0] mb-2">{title}</h1>
-      <p className="text-[#555] mb-6">Coming up next →</p>
-      <Link to="/" className="bg-[#E21111] text-white font-black uppercase text-xs px-6 py-3 rounded-xl tracking-widest hover:bg-red-700 transition-colors">
-        Back to Home
-      </Link>
+// Mini roster preview shown on overview tab (fetches separately to avoid blocking)
+const RosterPreview = ({ league, teamId }) => {
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    fetchTeamRoster(league, teamId)
+      .then(data => setPlayers(data.slice(0, 6)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [league, teamId]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-6">
+      <div className="w-5 h-5 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
     </div>
-  </div>
-);
+  );
+  if (!players.length) return <div className="text-[#555] text-xs text-center py-4">No player data available</div>;
+
+  return (
+    <div className="divide-y divide-[#2a2a2a]">
+      {players.map((p, i) => {
+        const statLine = playerStat(league, p);
+        const name = `${p.FirstName || ''} ${p.LastName || ''}`.trim();
+        return (
+          <div key={p.PlayerID || i} className="flex items-center gap-3 py-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#2a2a2a] flex items-center justify-center text-[10px] font-black text-[#555] shrink-0">
+              {p.Jersey || i + 1}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[#f0ebe0] text-sm font-bold truncate">{name}</div>
+              {statLine && <div className="text-[#555] text-[10px]">{statLine}</div>}
+            </div>
+            <span className={`text-[10px] font-black ${POS_COLOR(p.Position)}`}>{p.Position || '—'}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
+const LoginPage = () => {
+  const navigate = useNavigate();
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError]       = useState('');
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!email || !password) { setError('Please fill in all fields.'); return; }
+    // Placeholder — no backend yet
+    setError('Sign-in backend coming soon. Stay tuned!');
+  };
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-block">
+            <span className="text-[#E21111] font-black text-3xl tracking-tight">BOUNCE<span className="text-[#f0ebe0]">BACK</span></span>
+            <span className="text-[#555] text-xs font-black uppercase tracking-widest block mt-0.5">Talk</span>
+          </Link>
+        </div>
+
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+          <h1 className="text-xl font-black uppercase tracking-tight text-[#f0ebe0] mb-1">Sign In</h1>
+          <p className="text-[#555] text-xs mb-6">Access your picks, followed teams, and alerts.</p>
+
+          {error && (
+            <div className="bg-[#E21111]/10 border border-[#E21111]/20 rounded-xl px-4 py-3 text-[#E21111] text-xs font-bold mb-4">{error}</div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder:text-[#333] focus:outline-none focus:border-[#E21111] transition-colors" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder:text-[#333] focus:outline-none focus:border-[#E21111] transition-colors" />
+            </div>
+            <button type="submit"
+              className="w-full bg-[#E21111] hover:bg-red-700 text-white font-black uppercase text-xs py-3.5 rounded-xl tracking-widest transition-colors mt-2">
+              Sign In
+            </button>
+          </form>
+
+          <div className="mt-5 text-center">
+            <span className="text-[#555] text-xs">Don't have an account? </span>
+            <Link to="/register" className="text-[#E21111] text-xs font-black hover:underline">Join BBT</Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── REGISTER PAGE ────────────────────────────────────────────────────────────
+const RegisterPage = () => {
+  const [form, setForm]   = useState({ name: '', email: '', password: '', confirm: '' });
+  const [leagues, setLeagues] = useState([]);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+
+  const update = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const toggleLeague = key => setLeagues(l => l.includes(key) ? l.filter(x => x !== key) : [...l, key]);
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.password) { setError('Please fill in all required fields.'); return; }
+    if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
+    setSubmitted(true);
+  };
+
+  if (submitted) return (
+    <div className="min-h-[80vh] flex items-center justify-center px-4">
+      <div className="text-center max-w-sm">
+        <div className="text-6xl mb-4">🏆</div>
+        <h2 className="text-2xl font-black uppercase text-[#f0ebe0] mb-2">You're In, {form.name.split(' ')[0]}!</h2>
+        <p className="text-[#555] text-sm mb-6">Account creation backend is coming soon — we'll notify you at <span className="text-[#f0ebe0]">{form.email}</span> when it launches.</p>
+        <Link to="/" className="bg-[#E21111] text-white font-black uppercase text-xs px-6 py-3 rounded-xl tracking-widest hover:bg-red-700 transition-colors">
+          Back to Home
+        </Link>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-block">
+            <span className="text-[#E21111] font-black text-3xl tracking-tight">BOUNCE<span className="text-[#f0ebe0]">BACK</span></span>
+            <span className="text-[#555] text-xs font-black uppercase tracking-widest block mt-0.5">Talk</span>
+          </Link>
+        </div>
+
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+          <h1 className="text-xl font-black uppercase tracking-tight text-[#f0ebe0] mb-1">Join BounceBackTalk</h1>
+          <p className="text-[#555] text-xs mb-6">Follow teams, track picks, get alerts.</p>
+
+          {error && (
+            <div className="bg-[#E21111]/10 border border-[#E21111]/20 rounded-xl px-4 py-3 text-[#E21111] text-xs font-bold mb-4">{error}</div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Full Name *</label>
+              <input value={form.name} onChange={update('name')} placeholder="LeBron James"
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder:text-[#333] focus:outline-none focus:border-[#E21111] transition-colors" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Email *</label>
+              <input type="email" value={form.email} onChange={update('email')} placeholder="you@example.com"
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder:text-[#333] focus:outline-none focus:border-[#E21111] transition-colors" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Password *</label>
+              <input type="password" value={form.password} onChange={update('password')} placeholder="••••••••"
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder:text-[#333] focus:outline-none focus:border-[#E21111] transition-colors" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Confirm Password *</label>
+              <input type="password" value={form.confirm} onChange={update('confirm')} placeholder="••••••••"
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder:text-[#333] focus:outline-none focus:border-[#E21111] transition-colors" />
+            </div>
+
+            {/* Favorite leagues */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-2">Follow Leagues</label>
+              <div className="flex gap-2 flex-wrap">
+                {[{key:'nba',emoji:'🏀'},{key:'nfl',emoji:'🏈'},{key:'mlb',emoji:'⚾'},{key:'nhl',emoji:'🏒'}].map(l => (
+                  <button type="button" key={l.key} onClick={() => toggleLeague(l.key)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all
+                      ${leagues.includes(l.key)
+                        ? 'bg-[#E21111] border-[#E21111] text-white'
+                        : 'bg-[#0f0f0f] border-[#2a2a2a] text-[#555] hover:text-[#888]'}`}>
+                    {l.emoji} {l.key.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button type="submit"
+              className="w-full bg-[#E21111] hover:bg-red-700 text-white font-black uppercase text-xs py-3.5 rounded-xl tracking-widest transition-colors mt-2">
+              Create Account
+            </button>
+          </form>
+
+          <div className="mt-5 text-center">
+            <span className="text-[#555] text-xs">Already have an account? </span>
+            <Link to="/login" className="text-[#E21111] text-xs font-black hover:underline">Sign In</Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── PLAYER PROFILE PAGE ──────────────────────────────────────────────────────
+const fetchPlayerById = async (playerId) => {
+  // Try each league until we find the player
+  for (const league of ['nba', 'nfl', 'mlb']) {
+    try {
+      const res = await fetch(`${SPORTS_BASE}/${league}/scores/json/Player/${playerId}?key=${SPORTS_KEY}`);
+      if (!res.ok) continue;
+      const p = await res.json();
+      if (p && p.PlayerID) return { player: p, league };
+    } catch { continue; }
+  }
+  return null;
+};
+
+const PlayerPage = () => {
+  const { id } = useParams();
+  const [data, setData]   = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchPlayerById(id)
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+      <div className="w-8 h-8 border-2 border-[#E21111] border-t-transparent rounded-full animate-spin" />
+      <div className="text-[#555] text-xs font-black uppercase tracking-widest">Loading player...</div>
+    </div>
+  );
+
+  if (!data) return (
+    <div className="min-h-[60vh] flex items-center justify-center text-center px-4">
+      <div>
+        <div className="text-5xl mb-4">👤</div>
+        <h2 className="text-2xl font-black uppercase text-[#f0ebe0] mb-2">Player Not Found</h2>
+        <Link to="/" className="text-[#E21111] font-bold text-sm hover:underline">← Back to Home</Link>
+      </div>
+    </div>
+  );
+
+  const { player: p, league } = data;
+  const name = `${p.FirstName || ''} ${p.LastName || ''}`.trim();
+  const teamLogo = p.Team ? espnLogo(league, p.Team) : null;
+  const leagueObj = LEAGUES.find(l => l.key === league);
+
+  // Build stat rows based on sport
+  const statRows = (() => {
+    if (league === 'nba') return [
+      ['Points Per Game',   p.PointsPerGame?.toFixed(1)],
+      ['Rebounds Per Game', p.ReboundsPerGame?.toFixed(1)],
+      ['Assists Per Game',  p.AssistsPerGame?.toFixed(1)],
+      ['FG%',               p.FieldGoalsPercentage != null ? (p.FieldGoalsPercentage * 100).toFixed(1) + '%' : null],
+      ['3P%',               p.ThreePointersPercentage != null ? (p.ThreePointersPercentage * 100).toFixed(1) + '%' : null],
+      ['Minutes',           p.MinutesPerGame?.toFixed(1)],
+    ].filter(([, v]) => v != null);
+
+    if (league === 'nfl') return [
+      ['Passing Yards',   p.PassingYards],
+      ['Rushing Yards',   p.RushingYards],
+      ['Receiving Yards', p.ReceivingYards],
+      ['Touchdowns',      (p.PassingTouchdowns ?? 0) + (p.RushingTouchdowns ?? 0) + (p.ReceivingTouchdowns ?? 0) || null],
+      ['Interceptions',   p.Interceptions],
+      ['Sacks',           p.Sacks],
+    ].filter(([, v]) => v != null && v !== 0);
+
+    if (league === 'mlb') {
+      const isPitcher = ['SP','RP','P'].includes(p.Position);
+      if (isPitcher) return [
+        ['ERA',    p.EarnedRunAverage?.toFixed(2)],
+        ['WHIP',   p.WalksPlusHitsPerInningsPitched?.toFixed(2)],
+        ['Wins',   p.Wins],
+        ['Losses', p.Losses],
+        ['Strikeouts', p.PitchingStrikeouts],
+        ['Innings', p.InningsPitchedDecimal?.toFixed(1)],
+      ].filter(([, v]) => v != null);
+      return [
+        ['Batting Avg', p.BattingAverage != null ? `.${String(Math.round(p.BattingAverage * 1000)).padStart(3,'0')}` : null],
+        ['Home Runs',   p.HomeRuns],
+        ['RBI',         p.RunsBattedIn],
+        ['OBP',         p.OnBasePercentage?.toFixed(3)],
+        ['Runs',        p.Runs],
+        ['Stolen Bases',p.StolenBases],
+      ].filter(([, v]) => v != null);
+    }
+    return [];
+  })();
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-[#555] text-xs mb-6">
+        <Link to="/" className="hover:text-[#f0ebe0]">Home</Link>
+        <span>/</span>
+        {p.Team && <><Link to={`/team/${league}/${p.Team?.toLowerCase()}`} className="hover:text-[#f0ebe0]">{p.Team}</Link><span>/</span></>}
+        <span className="text-[#888]">{name}</span>
+      </div>
+
+      {/* Player hero */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6 md:p-8 mb-6">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          {/* Jersey number */}
+          <div className="w-20 h-20 rounded-2xl bg-[#E21111]/10 border border-[#E21111]/20 flex items-center justify-center shrink-0">
+            <span className="text-[#E21111] font-black text-3xl">{p.Jersey || '#'}</span>
+          </div>
+
+          <div className="flex-1 text-center sm:text-left">
+            <div className="text-[#555] text-[10px] font-black uppercase tracking-widest mb-1">
+              {leagueObj?.label}{p.Position ? ` · ${p.Position}` : ''}
+            </div>
+            <h1 className="text-3xl font-black uppercase tracking-tight text-[#f0ebe0] mb-2">{name}</h1>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+              {teamLogo && (
+                <div className="flex items-center gap-2 bg-[#2a2a2a]/60 rounded-xl px-3 py-1.5">
+                  <img src={teamLogo} alt={p.Team} className="w-5 h-5 object-contain"
+                    onError={e => { e.target.style.display='none'; }} />
+                  <Link to={`/team/${league}/${p.Team?.toLowerCase()}`}
+                    className="text-[#f0ebe0] text-xs font-black hover:text-[#E21111] transition-colors">{p.Team}</Link>
+                </div>
+              )}
+              {p.Experience != null && (
+                <span className="text-[#555] text-xs">{p.Experience === 0 ? 'Rookie' : `${p.Experience}Y Pro`}</span>
+              )}
+              {p.BirthCity && (
+                <span className="text-[#555] text-xs">📍 {p.BirthCity}{p.BirthState ? `, ${p.BirthState}` : ''}</span>
+              )}
+              {p.College && (
+                <span className="text-[#555] text-xs">🎓 {p.College}</span>
+              )}
+            </div>
+          </div>
+
+          <div className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-black uppercase border
+            ${p.Status === 'Active' ? 'text-green-400 bg-green-400/10 border-green-400/20'
+            : p.Status === 'Injured' ? 'text-[#E21111] bg-[#E21111]/10 border-[#E21111]/20'
+            : 'text-[#888] bg-[#2a2a2a] border-[#333]'}`}>
+            {p.Status || 'Unknown'}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      {statRows.length > 0 && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5 mb-4">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Season Stats</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {statRows.map(([label, val]) => (
+              <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-3 text-center">
+                <div className="text-[#f0ebe0] font-black text-xl">{val}</div>
+                <div className="text-[#555] text-[9px] font-black uppercase tracking-wider mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Physical info */}
+      {(p.Height || p.Weight || p.BirthDate) && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Info</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {p.Height && (
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black">{p.Height}</div>
+                <div className="text-[#555] text-[9px] uppercase tracking-widest">Height</div>
+              </div>
+            )}
+            {p.Weight && (
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black">{p.Weight} lbs</div>
+                <div className="text-[#555] text-[9px] uppercase tracking-widest">Weight</div>
+              </div>
+            )}
+            {p.BirthDate && (
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black">{new Date(p.BirthDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                <div className="text-[#555] text-[9px] uppercase tracking-widest">Born</div>
+              </div>
+            )}
+            {p.DraftYear && (
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black">{p.DraftYear} Rd {p.DraftRound}</div>
+                <div className="text-[#555] text-[9px] uppercase tracking-widest">Draft</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ─── HOME PAGE ────────────────────────────────────────────────────────────────
 const HomePage = () => {
@@ -2008,9 +2663,9 @@ export default function App() {
             <Route path="/league/:slug" element={<LeaguePage />} />
             <Route path="/game/:league/:id" element={<GamePreviewPage />} />
             <Route path="/team/:league/:id" element={<TeamPage />} />
-            <Route path="/player/:id" element={<ComingSoon title="Player Profile" />} />
-            <Route path="/login" element={<ComingSoon title="Sign In" />} />
-            <Route path="/register" element={<ComingSoon title="Join BounceBackTalk" />} />
+            <Route path="/player/:id" element={<PlayerPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
           </Routes>
         </main>
         <Footer />
