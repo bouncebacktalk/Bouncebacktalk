@@ -131,68 +131,100 @@ const normTeam = (league, t) => ({
 
 const ordinal = n => ['1st','2nd','3rd'][n-1] || `${n}th`;
 
-const mergeStandings = (teams, standings) => {
-  const map = {};
-  standings.forEach(s => { map[s.Key] = s; });
-  return teams.map(t => {
-    const s = map[t.abbr];
-    if (!s) return t;
-    const w = s.Wins ?? 0, l = s.Losses ?? 0;
-    const streak = s.StreakDescription || (s.Streak > 0 ? `W${s.Streak}` : s.Streak < 0 ? `L${Math.abs(s.Streak)}` : '');
-    const divRank = s.DivisionRank || s.LeagueRank || 0;
-    return { ...t,
-      record: `${w}-${l}`,
-      standing: divRank ? ordinal(divRank) : '—',
-      streak, wins: w, losses: l,
-      pct: s.Percentage ? s.Percentage.toFixed(3) : '—',
-      gb: s.GamesBack != null ? (s.GamesBack === 0 ? '—' : s.GamesBack) : '—',
-      ppg: s.PointsPerGameFor, oppPpg: s.PointsPerGameAgainst,
-    };
-  });
+// ─── ESPN STANDINGS (all 4 sports) ───────────────────────────────────────────
+const ESPN_SPORT_PATH = {
+  nba: 'basketball/nba',
+  nfl: 'football/nfl',
+  mlb: 'baseball/mlb',
+  nhl: 'hockey/nhl',
 };
 
+// Extract a stat value by name from ESPN's stats array
+const espnStat = (stats, name) => stats?.find(s => s.name === name)?.value ?? null;
+
+// Parse one ESPN standings entry into our flat team object
+const parseESPNEntry = (entry, conference, league) => {
+  const { team, stats = [] } = entry;
+  const wins    = espnStat(stats, 'wins')       ?? 0;
+  const losses  = espnStat(stats, 'losses')     ?? 0;
+  const otl     = espnStat(stats, 'otLosses')   ?? null; // NHL only
+  const pctRaw  = espnStat(stats, 'winPercent') ?? null;
+  const gb      = espnStat(stats, 'gamesBehind');
+  const pts     = espnStat(stats, 'points');     // NHL points
+  const seed    = espnStat(stats, 'playoffSeed') ?? 99;
+  const streakRaw = espnStat(stats, 'streak');   // numeric; positive=W negative=L
+
+  const pct = pctRaw != null
+    ? (league === 'mlb' ? pctRaw.toFixed(3).replace(/^0/, '') : pctRaw.toFixed(3))
+    : '—';
+
+  const streak = streakRaw != null
+    ? (streakRaw >= 0 ? `W${Math.abs(streakRaw)}` : `L${Math.abs(streakRaw)}`)
+    : '—';
+
+  const record = otl != null
+    ? `${wins}-${losses}-${otl}`   // NHL: W-L-OTL
+    : `${wins}-${losses}`;
+
+  return {
+    id:         team.id,
+    name:       team.displayName,
+    abbr:       team.abbreviation,
+    logo:       team.logos?.[0]?.href || team.logo || '',
+    conference,
+    wins,
+    losses,
+    otl,
+    pct,
+    gb:         gb != null ? (gb === 0 ? '—' : gb) : '—',
+    pts,        // NHL
+    streak,
+    record,
+    seed,
+  };
+};
+
+// Fetch standings from ESPN for a given league. Returns array of { conf, teams }
 const fetchLeagueData = async (league) => {
-  if (league === 'nhl') return null; // no API access for NHL
-  const season = 2026;
-  const [teamsRes, standRes] = await Promise.allSettled([
-    fetch(`${SPORTS_BASE}/${league}/scores/json/AllTeams?key=${SPORTS_KEY}`).then(r => r.json()),
-    fetch(`${SPORTS_BASE}/${league}/scores/json/Standings/${season}?key=${SPORTS_KEY}`).then(r => r.json()),
-  ]);
-  let teams = [];
-  if (teamsRes.status === 'fulfilled' && Array.isArray(teamsRes.value)) {
-    teams = teamsRes.value
-      .filter(t => t.PrimaryColor && t.City && t.City.length > 3)
-      .map(t => normTeam(league, t))
-      .sort((a, b) => a.name.localeCompare(b.name));
+  const sportPath = ESPN_SPORT_PATH[league];
+  if (!sportPath) return { teams: [], standingGroups: [] };
+
+  const res = await fetch(`https://site.api.espn.com/apis/v2/sports/${sportPath}/standings`);
+  const data = await res.json();
+
+  const groups = [];
+
+  // ESPN structure: root.children = conferences, each may have further children (divisions)
+  // For NBA/NFL/MLB/NHL the entries sit directly on the conference child
+  for (const conf of (data.children || [])) {
+    const entries = conf.standings?.entries;
+    if (entries?.length) {
+      // Flat: NBA, NHL, MLB — conference level
+      const teams = entries
+        .map(e => parseESPNEntry(e, conf.name, league))
+        .sort((a, b) => a.seed - b.seed);
+      groups.push({ conf: conf.name, teams });
+    } else if (conf.children?.length) {
+      // Nested: NFL has AFC/NFC with no further divisions at this level
+      for (const div of conf.children) {
+        const divEntries = div.standings?.entries || [];
+        const teams = divEntries
+          .map(e => parseESPNEntry(e, div.name, league))
+          .sort((a, b) => a.seed - b.seed);
+        if (teams.length) groups.push({ conf: div.name, teams });
+      }
+    }
   }
-  let rawStandings = [];
-  if (standRes.status === 'fulfilled' && Array.isArray(standRes.value) && standRes.value.length > 0) {
-    rawStandings = standRes.value;
-    teams = mergeStandings(teams, rawStandings);
-  }
-  return { teams, rawStandings };
+
+  // Also build a flat teams list for the Teams tab (sorted alphabetically)
+  const allTeams = groups.flatMap(g => g.teams)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return { teams: allTeams, standingGroups: groups };
 };
 
-// Group standings by division for display
-const groupStandings = (teams, rawStandings, league) => {
-  if (!rawStandings?.length) return [];
-  const map = {};
-  rawStandings.forEach(s => { map[s.Key] = s; });
-  const grouped = {};
-  teams.forEach(t => {
-    const s = map[t.abbr];
-    if (!s) return;
-    let groupKey = '';
-    if (league === 'nba') groupKey = s.Conference;
-    else if (league === 'nfl') groupKey = `${s.Conference} ${s.Division}`;
-    else groupKey = `${s.League} ${s.Division}`;
-    if (!grouped[groupKey]) grouped[groupKey] = [];
-    grouped[groupKey].push({ ...t, divRank: s.DivisionRank || s.LeagueRank || 99 });
-  });
-  return Object.entries(grouped)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([conf, ts]) => ({ conf, teams: ts.sort((a, b) => a.divRank - b.divRank) }));
-};
+// Legacy shim — groupStandings no longer needed, kept to avoid call-site errors
+const groupStandings = () => [];
 
 const fetchTeamRoster = async (league, teamKey) => {
   if (league === 'nhl') return [];
@@ -1918,17 +1950,11 @@ const LeaguePage = () => {
 
   useEffect(() => {
     setLoading(true);
-    if (league === 'nhl') {
-      setTeams(NHL_TEAMS);
-      setStandingGroups(NHL_STANDINGS);
-      setLoading(false);
-      return;
-    }
     fetchLeagueData(league)
       .then(data => {
         if (!data) return;
         setTeams(data.teams);
-        setStandingGroups(groupStandings(data.teams, data.rawStandings, league));
+        setStandingGroups(data.standingGroups);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
