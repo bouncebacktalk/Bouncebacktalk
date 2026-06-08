@@ -62,6 +62,53 @@ const fetchScores = async () => {
 const SPORTS_KEY = 'cd48920d0d784a2199d1ceefa5183f6b';
 const SPORTS_BASE = 'https://api.sportsdata.io/v3';
 
+// ─── THE ODDS API ─────────────────────────────────────────────────────────────
+const ODDS_API_KEY = '3987a37833bfdb5954366c952b713632';
+const ODDS_SPORT_KEY = { nba: 'basketball_nba', mlb: 'baseball_mlb', nfl: 'americanfootball_nfl', nhl: 'icehockey_nhl' };
+
+// Fetch live odds for a sport. Returns array of game objects with parsed lines.
+const fetchOddsForSport = async (league) => {
+  const sportKey = ODDS_SPORT_KEY[league];
+  if (!sportKey) return [];
+  const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  return res.json();
+};
+
+// Parse a single Odds API game object into a flat odds object
+const parseOddsGame = (game, isMLB) => {
+  // Prefer FanDuel, then DraftKings, then first available
+  const book = game.bookmakers?.find(b => b.key === 'fanduel')
+    || game.bookmakers?.find(b => b.key === 'draftkings')
+    || game.bookmakers?.[0];
+  if (!book) return null;
+
+  const h2h     = book.markets?.find(m => m.key === 'h2h');
+  const spreads = book.markets?.find(m => m.key === 'spreads');
+  const totals  = book.markets?.find(m => m.key === 'totals');
+
+  const homeH2H   = h2h?.outcomes?.find(o => o.name === game.home_team);
+  const awayH2H   = h2h?.outcomes?.find(o => o.name === game.away_team);
+  const homeSpread = spreads?.outcomes?.find(o => o.name === game.home_team);
+  const awaySpread = spreads?.outcomes?.find(o => o.name === game.away_team);
+  const overLine  = totals?.outcomes?.find(o => o.name === 'Over');
+
+  return {
+    isMLB,
+    bookmaker: book.title,
+    homeML: homeH2H?.price ?? null,
+    awayML: awayH2H?.price ?? null,
+    // For spreads & run lines
+    homeSpreadPoint: homeSpread?.point ?? null,
+    awaySpreadPoint: awaySpread?.point ?? null,
+    homeSpreadOdds:  homeSpread?.price ?? null,
+    awaySpreadOdds:  awaySpread?.price ?? null,
+    total: overLine?.point ?? null,
+    channel: null, // Odds API doesn't provide broadcast info
+  };
+};
+
 // Some SportsData keys differ from ESPN CDN slugs
 const ESPN_SLUG = {
   nba: { GSW: 'gs', NYK: 'ny', NOP: 'no', SAS: 'sa', WAS: 'wsh' },
@@ -1079,42 +1126,22 @@ const GamePreviewPage = () => {
         // 2. SportsData.io — odds from today's game list (NHL skipped)
         if (league !== 'nhl') {
           try {
-            const today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'short', day:'2-digit' }).replace(/ /g,'-').replace(',','').toUpperCase();
-            const sdRes = await fetch(`${SPORTS_BASE}/${league}/scores/json/GamesByDate/${today}?key=${SPORTS_KEY}`);
-            const sdGames = await sdRes.json();
-            if (Array.isArray(sdGames)) {
-              // Match by team abbreviations
-              const sdGame = sdGames.find(g =>
-                (g.HomeTeam === homeAbbr && g.AwayTeam === awayAbbr) ||
-                (g.HomeTeam === homeAbbr.replace('WSH','WAS') && g.AwayTeam === awayAbbr) ||
-                (g.HomeTeam === homeAbbr && g.AwayTeam === awayAbbr.replace('WSH','WAS'))
+            const isMLB = league === 'mlb';
+            const oddsGames = await fetchOddsForSport(league);
+            if (Array.isArray(oddsGames) && oddsGames.length) {
+              // Match by full team name — ESPN displayName vs Odds API home_team/away_team
+              const homeName = gameObj.home.name.toLowerCase();
+              const awayName = gameObj.away.name.toLowerCase();
+              const match = oddsGames.find(g =>
+                g.home_team.toLowerCase().includes(homeName.split(' ').pop()) &&
+                g.away_team.toLowerCase().includes(awayName.split(' ').pop())
+              ) || oddsGames.find(g =>
+                homeName.includes(g.home_team.toLowerCase().split(' ').pop()) &&
+                awayName.includes(g.away_team.toLowerCase().split(' ').pop())
               );
-              if (sdGame) {
-                const isMLB = league === 'mlb';
-                const rawOU = sdGame.OverUnder;
-                // Sanity-check O/U per sport (NBA totals are 200+, MLB 7-15, NFL 35-65)
-                const ouSane = rawOU != null && (
-                  (league === 'nba' && rawOU > 150) ||
-                  (isMLB && rawOU >= 5 && rawOU <= 20) ||
-                  (league === 'nfl' && rawOU >= 30 && rawOU <= 80) ||
-                  (!['nba','mlb','nfl'].includes(league))
-                );
-                // MLB: run line is always -1.5 / +1.5; determine who's the fave by ML
-                const awayIsFave = isMLB && (sdGame.AwayTeamMoneyLine != null) && sdGame.AwayTeamMoneyLine < 0;
-                setOdds({
-                  isMLB,
-                  // MLB: don't show PointSpread — show run line instead
-                  spread:       isMLB ? null : sdGame.PointSpread,
-                  // MLB run line: away team gets -1.5 if fave, +1.5 if dog
-                  runLineAway:  isMLB ? (awayIsFave ? -1.5 : 1.5) : null,
-                  runLineHome:  isMLB ? (awayIsFave ? 1.5 : -1.5) : null,
-                  runLineAwayOdds: isMLB ? sdGame.PointSpreadAwayTeamMoneyLine : null,
-                  runLineHomeOdds: isMLB ? sdGame.PointSpreadHomeTeamMoneyLine : null,
-                  total:        ouSane ? rawOU : null,
-                  homeML:       sdGame.HomeTeamMoneyLine,
-                  awayML:       sdGame.AwayTeamMoneyLine,
-                  channel:      sdGame.Channel || null,
-                });
+              if (match) {
+                const parsed = parseOddsGame(match, isMLB);
+                if (parsed) setOdds(parsed);
               }
             }
           } catch { /* odds unavailable */ }
@@ -1227,9 +1254,9 @@ const GamePreviewPage = () => {
                 </div>
                 <div className="text-[#f0ebe0] font-bold text-sm">
                   {odds.isMLB
-                    ? `${game.away.abbr} ${fmtML(odds.runLineAway)} / ${game.home.abbr} ${fmtML(odds.runLineHome)}`
-                    : odds.spread != null
-                      ? `${game.home.abbr} ${odds.spread <= 0 ? odds.spread : `+${odds.spread}`}`
+                    ? `${game.away.abbr} ${fmtML(odds.awaySpreadPoint)} (${fmtML(odds.awaySpreadOdds)}) / ${game.home.abbr} ${fmtML(odds.homeSpreadPoint)} (${fmtML(odds.homeSpreadOdds)})`
+                    : odds.homeSpreadPoint != null
+                      ? `${game.home.abbr} ${fmtML(odds.homeSpreadPoint)} (${fmtML(odds.homeSpreadOdds)})`
                       : '—'
                   }
                 </div>
@@ -1313,7 +1340,7 @@ const GamePreviewPage = () => {
                   // Spread/Run Line
                   odds.isMLB
                     ? [null, null]  // handled separately below
-                    : ['Spread', odds.spread != null ? `${game.home.abbr} ${odds.spread <= 0 ? odds.spread : `+${odds.spread}`}` : '—'],
+                    : ['Spread', odds.homeSpreadPoint != null ? `${game.home.abbr} ${fmtML(odds.homeSpreadPoint)} (${fmtML(odds.homeSpreadOdds)})` : '—'],
                   // O/U — only if sane
                   ['O/U', odds.total != null ? String(odds.total) : '—'],
                   [`${game.away.abbr} ML`, fmtML(odds.awayML)],
@@ -1326,8 +1353,8 @@ const GamePreviewPage = () => {
                 ))}
                 {/* MLB Run Line — two separate cells */}
                 {odds.isMLB && [
-                  [`${game.away.abbr} RL`, `${fmtML(odds.runLineAway)} (${fmtML(odds.runLineAwayOdds)})`],
-                  [`${game.home.abbr} RL`, `${fmtML(odds.runLineHome)} (${fmtML(odds.runLineHomeOdds)})`],
+                  [`${game.away.abbr} RL`, `${fmtML(odds.awaySpreadPoint)} (${fmtML(odds.awaySpreadOdds)})`],
+                  [`${game.home.abbr} RL`, `${fmtML(odds.homeSpreadPoint)} (${fmtML(odds.homeSpreadOdds)})`],
                 ].map(([label, val]) => (
                   <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-3 text-center">
                     <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-1">{label}</div>
@@ -1377,8 +1404,8 @@ const GamePreviewPage = () => {
                             <span className="text-[#888] text-sm font-bold">{game.away.abbr}</span>
                           </div>
                           <div className="text-right">
-                            <span className="text-[#f0ebe0] font-black text-lg">{fmtML(odds.runLineAway)}</span>
-                            <span className="text-[#555] text-xs ml-1">({fmtML(odds.runLineAwayOdds)})</span>
+                            <span className="text-[#f0ebe0] font-black text-lg">{fmtML(odds.awaySpreadPoint)}</span>
+                            <span className="text-[#555] text-xs ml-1">({fmtML(odds.awaySpreadOdds)})</span>
                           </div>
                         </div>
                         <div className="flex items-center justify-between mt-3">
@@ -1387,8 +1414,8 @@ const GamePreviewPage = () => {
                             <span className="text-[#888] text-sm font-bold">{game.home.abbr}</span>
                           </div>
                           <div className="text-right">
-                            <span className="text-[#f0ebe0] font-black text-lg">{fmtML(odds.runLineHome)}</span>
-                            <span className="text-[#555] text-xs ml-1">({fmtML(odds.runLineHomeOdds)})</span>
+                            <span className="text-[#f0ebe0] font-black text-lg">{fmtML(odds.homeSpreadPoint)}</span>
+                            <span className="text-[#555] text-xs ml-1">({fmtML(odds.homeSpreadOdds)})</span>
                           </div>
                         </div>
                       </>
