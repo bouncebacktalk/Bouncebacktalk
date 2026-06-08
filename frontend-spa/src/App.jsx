@@ -1286,6 +1286,388 @@ const GamePreviewPage = () => {
   );
 };
 
+// ─── TEAM PAGE ───────────────────────────────────────────────────────────────
+const TEAM_DATA = {
+  nba: [
+    { id: 'okc', name: 'Oklahoma City Thunder', abbr: 'OKC', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/okc.png', record: '57-25', conf: 'Western', standing: '1st', color: '#007AC1' },
+    { id: 'ind', name: 'Indiana Pacers', abbr: 'IND', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ind.png', record: '50-32', conf: 'Eastern', standing: '4th', color: '#002D62' },
+    { id: 'bos', name: 'Boston Celtics', abbr: 'BOS', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/bos.png', record: '61-21', conf: 'Eastern', standing: '1st', color: '#007A33' },
+    { id: 'den', name: 'Denver Nuggets', abbr: 'DEN', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/den.png', record: '54-28', conf: 'Western', standing: '2nd', color: '#0E2240' },
+    { id: 'mia', name: 'Miami Heat', abbr: 'MIA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/mia.png', record: '44-38', conf: 'Eastern', standing: '6th', color: '#98002E' },
+    { id: 'lal', name: 'LA Lakers', abbr: 'LAL', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/lal.png', record: '45-37', conf: 'Western', standing: '5th', color: '#552583' },
+  ],
+  nfl: [
+    { id: 'kc', name: 'Kansas City Chiefs', abbr: 'KC', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/kc.png', record: '15-2', conf: 'AFC', standing: '1st', color: '#E31837' },
+    { id: 'sf', name: 'San Francisco 49ers', abbr: 'SF', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/sf.png', record: '12-5', conf: 'NFC', standing: '1st', color: '#AA0000' },
+    { id: 'phi', name: 'Philadelphia Eagles', abbr: 'PHI', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png', record: '11-6', conf: 'NFC', standing: '2nd', color: '#004C54' },
+    { id: 'bal', name: 'Baltimore Ravens', abbr: 'BAL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/bal.png', record: '13-4', conf: 'AFC', standing: '2nd', color: '#241773' },
+    { id: 'dal', name: 'Dallas Cowboys', abbr: 'DAL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/dal.png', record: '10-7', conf: 'NFC', standing: '3rd', color: '#003594' },
+    { id: 'det', name: 'Detroit Lions', abbr: 'DET', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/det.png', record: '12-5', conf: 'NFC', standing: '1st', color: '#0076B6' },
+  ],
+  mlb: [
+    { id: 'nyy', name: 'New York Yankees', abbr: 'NYY', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/nyy.png', record: '45-22', conf: 'AL East', standing: '1st', color: '#003087' },
+    { id: 'lad', name: 'Los Angeles Dodgers', abbr: 'LAD', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/lad.png', record: '43-24', conf: 'NL West', standing: '1st', color: '#005A9C' },
+    { id: 'atl', name: 'Atlanta Braves', abbr: 'ATL', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/atl.png', record: '40-27', conf: 'NL East', standing: '1st', color: '#CE1141' },
+    { id: 'hou', name: 'Houston Astros', abbr: 'HOU', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/hou.png', record: '38-29', conf: 'AL West', standing: '1st', color: '#002D62' },
+    { id: 'bos', name: 'Boston Red Sox', abbr: 'BOS', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/bos.png', record: '35-32', conf: 'AL East', standing: '3rd', color: '#BD3039' },
+    { id: 'chc', name: 'Chicago Cubs', abbr: 'CHC', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/chc.png', record: '36-31', conf: 'NL Central', standing: '2nd', color: '#0E3386' },
+  ],
+  nhl: [
+    { id: 'fla', name: 'Florida Panthers', abbr: 'FLA', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/fla.png', record: '52-21-9', conf: 'Eastern', standing: '1st', color: '#C8102E' },
+    { id: 'edm', name: 'Edmonton Oilers', abbr: 'EDM', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/edm.png', record: '49-27-6', conf: 'Western', standing: '1st', color: '#FF4C00' },
+    { id: 'col', name: 'Colorado Avalanche', abbr: 'COL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/col.png', record: '50-23-9', conf: 'Western', standing: '2nd', color: '#6F263D' },
+    { id: 'tb', name: 'Tampa Bay Lightning', abbr: 'TB', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/tb.png', record: '46-28-8', conf: 'Eastern', standing: '2nd', color: '#002868' },
+    { id: 'tor', name: 'Toronto Maple Leafs', abbr: 'TOR', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/tor.png', record: '44-30-8', conf: 'Eastern', standing: '3rd', color: '#003E7E' },
+    { id: 'vgk', name: 'Vegas Golden Knights', abbr: 'VGK', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/vgk.png', record: '45-29-8', conf: 'Western', standing: '3rd', color: '#B4975A' },
+  ],
+};
+
+const LEAGUE_STANDINGS = {
+  nba: [
+    { conf: 'Eastern', teams: [
+      { pos: 1, name: 'Boston Celtics', abbr: 'BOS', w: 61, l: 21, pct: '.744', gb: '—', streak: 'W3' },
+      { pos: 2, name: 'New York Knicks', abbr: 'NYK', w: 51, l: 31, pct: '.622', gb: '10', streak: 'L1' },
+      { pos: 3, name: 'Milwaukee Bucks', abbr: 'MIL', w: 49, l: 33, pct: '.598', gb: '12', streak: 'W2' },
+      { pos: 4, name: 'Indiana Pacers', abbr: 'IND', w: 50, l: 32, pct: '.610', gb: '11', streak: 'W1' },
+    ]},
+    { conf: 'Western', teams: [
+      { pos: 1, name: 'OKC Thunder', abbr: 'OKC', w: 57, l: 25, pct: '.695', gb: '—', streak: 'W5' },
+      { pos: 2, name: 'Denver Nuggets', abbr: 'DEN', w: 54, l: 28, pct: '.659', gb: '3', streak: 'W2' },
+      { pos: 3, name: 'Minnesota Timberwolves', abbr: 'MIN', w: 53, l: 29, pct: '.646', gb: '4', streak: 'L2' },
+      { pos: 4, name: 'LA Lakers', abbr: 'LAL', w: 45, l: 37, pct: '.549', gb: '12', streak: 'W1' },
+    ]},
+  ],
+  nfl: [
+    { conf: 'AFC', teams: [
+      { pos: 1, name: 'Kansas City Chiefs', abbr: 'KC', w: 15, l: 2, pct: '.882', gb: '—', streak: 'W8' },
+      { pos: 2, name: 'Baltimore Ravens', abbr: 'BAL', w: 13, l: 4, pct: '.765', gb: '2', streak: 'W3' },
+      { pos: 3, name: 'Buffalo Bills', abbr: 'BUF', w: 11, l: 6, pct: '.647', gb: '4', streak: 'W1' },
+      { pos: 4, name: 'Miami Dolphins', abbr: 'MIA', w: 9, l: 8, pct: '.529', gb: '6', streak: 'L2' },
+    ]},
+    { conf: 'NFC', teams: [
+      { pos: 1, name: 'San Francisco 49ers', abbr: 'SF', w: 12, l: 5, pct: '.706', gb: '—', streak: 'W2' },
+      { pos: 2, name: 'Philadelphia Eagles', abbr: 'PHI', w: 11, l: 6, pct: '.647', gb: '1', streak: 'W4' },
+      { pos: 3, name: 'Detroit Lions', abbr: 'DET', w: 12, l: 5, pct: '.706', gb: '—', streak: 'L1' },
+      { pos: 4, name: 'Dallas Cowboys', abbr: 'DAL', w: 10, l: 7, pct: '.588', gb: '2', streak: 'W1' },
+    ]},
+  ],
+  mlb: [
+    { conf: 'AL East', teams: [
+      { pos: 1, name: 'New York Yankees', abbr: 'NYY', w: 45, l: 22, pct: '.672', gb: '—', streak: 'W2' },
+      { pos: 2, name: 'Baltimore Orioles', abbr: 'BAL', w: 40, l: 27, pct: '.597', gb: '5', streak: 'W1' },
+      { pos: 3, name: 'Boston Red Sox', abbr: 'BOS', w: 35, l: 32, pct: '.522', gb: '10', streak: 'L3' },
+    ]},
+    { conf: 'NL West', teams: [
+      { pos: 1, name: 'Los Angeles Dodgers', abbr: 'LAD', w: 43, l: 24, pct: '.642', gb: '—', streak: 'W4' },
+      { pos: 2, name: 'San Diego Padres', abbr: 'SD', w: 37, l: 30, pct: '.552', gb: '6', streak: 'W2' },
+      { pos: 3, name: 'San Francisco Giants', abbr: 'SF', w: 33, l: 34, pct: '.493', gb: '10', streak: 'L1' },
+    ]},
+  ],
+  nhl: [
+    { conf: 'Eastern', teams: [
+      { pos: 1, name: 'Florida Panthers', abbr: 'FLA', w: 52, l: 21, pct: '.704', gb: '—', streak: 'W3' },
+      { pos: 2, name: 'Tampa Bay Lightning', abbr: 'TB', w: 46, l: 28, pct: '.621', gb: '6', streak: 'W1' },
+      { pos: 3, name: 'Toronto Maple Leafs', abbr: 'TOR', w: 44, l: 30, pct: '.595', gb: '8', streak: 'L2' },
+    ]},
+    { conf: 'Western', teams: [
+      { pos: 1, name: 'Edmonton Oilers', abbr: 'EDM', w: 49, l: 27, pct: '.645', gb: '—', streak: 'W6' },
+      { pos: 2, name: 'Colorado Avalanche', abbr: 'COL', w: 50, l: 23, pct: '.676', gb: '—', streak: 'W2' },
+      { pos: 3, name: 'Vegas Golden Knights', abbr: 'VGK', w: 45, l: 29, pct: '.608', gb: '4', streak: 'L1' },
+    ]},
+  ],
+};
+
+// League landing page — shows all teams + standings
+const LeaguePage = () => {
+  const { slug } = useParams();
+  const league = slug?.toLowerCase();
+  const label = LEAGUES.find(l => l.key === league)?.label || league?.toUpperCase();
+  const teams = TEAM_DATA[league] || [];
+  const standings = LEAGUE_STANDINGS[league] || [];
+  const [activeTab, setActiveTab] = useState('teams');
+  const emojis = { nba: '🏀', nfl: '🏈', mlb: '⚾', nhl: '🏒' };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-8">
+        <span className="text-5xl">{emojis[league] || '🏆'}</span>
+        <div>
+          <h1 className="text-4xl font-black uppercase tracking-tight text-[#f0ebe0]">{label}</h1>
+          <p className="text-[#555] text-sm">Teams · Standings · Scores</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-8 border-b border-[#2a2a2a]">
+        {['teams', 'standings'].map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            className={`px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px ${
+              activeTab === t ? 'text-[#f0ebe0] border-[#E21111]' : 'text-[#555] border-transparent hover:text-[#888]'
+            }`}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'teams' && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {teams.map(team => (
+            <Link key={team.id} to={`/team/${league}/${team.id}`}
+              className="bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-2xl p-4 flex items-center gap-4 transition-all group hover:-translate-y-0.5">
+              <img src={team.logo} alt={team.abbr} className="w-12 h-12 object-contain shrink-0" onError={e => { e.target.style.display='none'; }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[#f0ebe0] font-black text-sm truncate">{team.name}</div>
+                <div className="text-[#555] text-[10px] mt-0.5">{team.conf} · {team.standing} · {team.record}</div>
+              </div>
+              <ChevronRight size={14} className="text-[#333] group-hover:text-[#E21111] transition-colors shrink-0" />
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'standings' && (
+        <div className="space-y-6">
+          {standings.map(div => (
+            <div key={div.conf}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">{div.conf}</h3>
+              </div>
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+                <div className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem_3rem_3rem] gap-2 px-4 py-2 border-b border-[#2a2a2a] text-[9px] font-black uppercase tracking-widest text-[#444]">
+                  <span>#</span><span>Team</span><span className="text-center">W</span><span className="text-center">L</span>
+                  <span className="text-center">PCT</span><span className="text-center">GB</span><span className="text-center">STK</span>
+                </div>
+                {div.teams.map((t, i) => (
+                  <Link key={t.abbr} to={`/team/${league}/${t.abbr.toLowerCase()}`}
+                    className="grid grid-cols-[2rem_1fr_3rem_3rem_3rem_3rem_3rem] gap-2 px-4 py-3 border-b border-[#2a2a2a] last:border-0 hover:bg-white/5 transition-colors items-center">
+                    <span className="text-[#555] text-xs font-black">{t.pos}</span>
+                    <span className="text-[#f0ebe0] text-xs font-bold truncate">{t.name}</span>
+                    <span className="text-[#f0ebe0] text-xs font-black text-center">{t.w}</span>
+                    <span className="text-[#888] text-xs text-center">{t.l}</span>
+                    <span className="text-[#888] text-xs text-center">{t.pct}</span>
+                    <span className="text-[#555] text-xs text-center">{t.gb}</span>
+                    <span className={`text-[10px] font-black text-center ${t.streak.startsWith('W') ? 'text-green-400' : 'text-[#E21111]'}`}>{t.streak}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Individual team page
+const TeamPage = () => {
+  const { league, id } = useParams();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [games, setGames] = useState([]);
+
+  const leagueObj = LEAGUES.find(l => l.key === league);
+  const allTeams = TEAM_DATA[league] || [];
+  const team = allTeams.find(t => t.id === id) || allTeams[0];
+
+  useEffect(() => {
+    if (!leagueObj) return;
+    fetchScores().then(all => setGames(all.filter(g => g.league === league))).catch(() => {});
+  }, [league]);
+
+  if (!team) return (
+    <div className="min-h-screen flex items-center justify-center text-center">
+      <div>
+        <div className="text-5xl mb-4">🏟️</div>
+        <h2 className="text-2xl font-black uppercase text-[#f0ebe0] mb-3">Team Not Found</h2>
+        <Link to={`/league/${league}`} className="text-[#E21111] font-bold text-sm hover:underline">← Back to {leagueObj?.label}</Link>
+      </div>
+    </div>
+  );
+
+  const schedule = [
+    { date: 'Jun 6', opponent: 'vs MIL', result: 'W 118-104', home: true },
+    { date: 'Jun 4', opponent: '@ BOS', result: 'L 98-112', home: false },
+    { date: 'Jun 2', opponent: 'vs PHX', result: 'W 126-115', home: true },
+    { date: 'May 31', opponent: '@ DEN', result: 'W 109-107', home: false },
+    { date: 'May 29', opponent: 'vs LAL', result: 'W 122-110', home: true },
+    { date: 'Jun 10', opponent: 'vs IND', result: 'TBD', home: true, upcoming: true },
+    { date: 'Jun 12', opponent: '@ BOS', result: 'TBD', home: false, upcoming: true },
+    { date: 'Jun 15', opponent: 'vs MIL', result: 'TBD', home: true, upcoming: true },
+  ];
+
+  const injuries = [
+    { player: 'J. Haliburton', pos: 'PG', status: 'Questionable', detail: 'Hamstring', updated: 'Today' },
+    { player: 'M. Bridges', pos: 'SF', status: 'Probable', detail: 'Ankle', updated: 'Yesterday' },
+    { player: 'I. Hartenstein', pos: 'C', status: 'Out', detail: 'Back spasms', updated: '2 days ago' },
+  ];
+
+  const stats = league === 'nba'
+    ? [['PPG', '118.4'], ['OPP PPG', '110.2'], ['REB', '44.1'], ['AST', '26.8'], ['FG%', '47.2%'], ['3P%', '36.8%']]
+    : league === 'nfl'
+    ? [['PTS/G', '27.4'], ['OPP PTS', '19.8'], ['YDS/G', '384'], ['RUSH YDS', '142'], ['PASS YDS', '242'], ['SACKS', '42']]
+    : league === 'mlb'
+    ? [['AVG', '.268'], ['ERA', '3.42'], ['HR', '84'], ['RBI', '312'], ['OBP', '.338'], ['WHIP', '1.18']]
+    : [['GF', '3.4'], ['GA', '2.8'], ['PP%', '22.4%'], ['PK%', '81.2%'], ['SV%', '.912'], ['SO', '34']];
+
+  const recentForm = ['W', 'W', 'L', 'W', 'W'];
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-[#555] text-xs mb-6">
+        <Link to="/" className="hover:text-[#f0ebe0]">Home</Link>
+        <span>/</span>
+        <Link to={`/league/${league}`} className="hover:text-[#f0ebe0]">{leagueObj?.label}</Link>
+        <span>/</span>
+        <span className="text-[#888]">{team.abbr}</span>
+      </div>
+
+      {/* Team hero */}
+      <div className="relative rounded-2xl overflow-hidden mb-6 bg-[#1a1a1a] border border-[#2a2a2a]">
+        <div className="absolute inset-0 opacity-10" style={{ background: `linear-gradient(135deg, ${team.color}, transparent)` }} />
+        <div className="relative p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6">
+          <img src={team.logo} alt={team.name} className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-2xl shrink-0"
+            onError={e => { e.target.style.display='none'; }} />
+          <div className="flex-1 text-center md:text-left">
+            <div className="text-[#555] text-[10px] font-black uppercase tracking-widest mb-1">{leagueObj?.label} · {team.conf}</div>
+            <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tight text-[#f0ebe0] mb-2">{team.name}</h1>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-3">
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black text-xl">{team.record}</div>
+                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Record</div>
+              </div>
+              <div className="w-px h-8 bg-[#2a2a2a]" />
+              <div className="text-center">
+                <div className="text-[#f0ebe0] font-black text-xl">{team.standing}</div>
+                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest">Conf. Standing</div>
+              </div>
+              <div className="w-px h-8 bg-[#2a2a2a]" />
+              <div className="flex items-center gap-1.5">
+                {recentForm.map((r, i) => (
+                  <span key={i} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ${r === 'W' ? 'bg-green-500/20 text-green-400' : 'bg-[#E21111]/20 text-[#E21111]'}`}>{r}</span>
+                ))}
+                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest ml-1">Last 5</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Follow button */}
+          <Link to="/register"
+            className="shrink-0 flex items-center gap-2 bg-[#E21111] hover:bg-red-700 text-white font-black uppercase text-xs px-5 py-2.5 rounded-xl tracking-widest transition-colors">
+            <BellIcon size={13} /> Follow
+          </Link>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-6 border-b border-[#2a2a2a]">
+        {['overview', 'schedule', 'injuries'].map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            className={`px-4 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px ${
+              activeTab === t ? 'text-[#f0ebe0] border-[#E21111]' : 'text-[#555] border-transparent hover:text-[#888]'
+            }`}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (
+        <div className="space-y-4">
+          {/* Season Stats */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Season Stats</h3>
+            </div>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {stats.map(([label, val]) => (
+                <div key={label} className="bg-[#2a2a2a]/50 rounded-xl p-3 text-center">
+                  <div className="text-[#f0ebe0] font-black text-lg">{val}</div>
+                  <div className="text-[#555] text-[9px] font-black uppercase tracking-wider">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Today's game if any */}
+          {games.filter(g => g.home.name === team.abbr || g.away.name === team.abbr).slice(0, 1).map(g => (
+            <Link key={g.id} to={`/game/${g.league}/${g.id}`}
+              className="flex items-center gap-4 bg-gradient-to-r from-[#E21111]/10 to-transparent border border-[#E21111]/20 rounded-2xl p-5 hover:border-[#E21111]/40 transition-all group">
+              <div className="text-3xl">🏟️</div>
+              <div className="flex-1">
+                <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mb-0.5">
+                  {g.isLive ? '🔴 LIVE NOW' : g.isFinal ? 'FINAL' : 'TODAY'}
+                </div>
+                <div className="text-[#f0ebe0] font-black text-sm">{g.away.name} vs {g.home.name}</div>
+                {(g.isLive || g.isFinal) && (
+                  <div className="text-[#888] text-xs">{g.away.score} – {g.home.score} · {g.statusText}</div>
+                )}
+              </div>
+              <ChevronRight size={18} className="text-[#E21111] group-hover:translate-x-1 transition-transform" />
+            </Link>
+          ))}
+
+          {/* Next upcoming game */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 bg-[#E21111] rounded-full" />
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Upcoming</h3>
+            </div>
+            {schedule.filter(s => s.upcoming).slice(0, 3).map((s, i) => (
+              <div key={i} className="flex items-center justify-between py-2.5 border-b border-[#2a2a2a] last:border-0">
+                <div className="flex items-center gap-3">
+                  <span className="text-[#555] text-xs w-12">{s.date}</span>
+                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${s.home ? 'bg-[#2a2a2a] text-[#888]' : 'text-[#555]'}`}>{s.home ? 'HOME' : 'AWAY'}</span>
+                  <span className="text-[#f0ebe0] text-xs font-bold">{s.opponent}</span>
+                </div>
+                <span className="text-[#555] text-xs">TBD</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'schedule' && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+          <div className="grid grid-cols-[3rem_4rem_1fr_5rem] gap-4 px-5 py-3 border-b border-[#2a2a2a] text-[9px] font-black uppercase tracking-widest text-[#444]">
+            <span>Date</span><span>H/A</span><span>Opponent</span><span>Result</span>
+          </div>
+          {schedule.map((s, i) => (
+            <div key={i} className={`grid grid-cols-[3rem_4rem_1fr_5rem] gap-4 px-5 py-3.5 border-b border-[#2a2a2a] last:border-0 items-center ${s.upcoming ? 'opacity-60' : ''}`}>
+              <span className="text-[#555] text-xs">{s.date}</span>
+              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-center ${s.home ? 'bg-[#2a2a2a] text-[#888]' : 'text-[#555]'}`}>{s.home ? 'Home' : 'Away'}</span>
+              <span className="text-[#f0ebe0] text-xs font-bold">{s.opponent}</span>
+              <span className={`text-xs font-black ${s.result.startsWith('W') ? 'text-green-400' : s.result.startsWith('L') ? 'text-[#E21111]' : 'text-[#555]'}`}>{s.result}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'injuries' && (
+        <div className="space-y-3">
+          {injuries.length === 0 ? (
+            <div className="text-center py-12 text-[#555]">No injury reports available.</div>
+          ) : injuries.map((inj, i) => (
+            <div key={i} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-[#2a2a2a] flex items-center justify-center text-[11px] font-black text-[#888] shrink-0">{inj.pos}</div>
+              <div className="flex-1">
+                <div className="text-[#f0ebe0] font-black text-sm">{inj.player}</div>
+                <div className="text-[#555] text-xs">{inj.detail} · Updated {inj.updated}</div>
+              </div>
+              <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${
+                inj.status === 'Out' ? 'text-[#E21111] bg-[#E21111]/10 border-[#E21111]/20'
+                : inj.status === 'Questionable' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20'
+                : 'text-green-400 bg-green-400/10 border-green-400/20'
+              }`}>{inj.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── PLACEHOLDER PAGES ────────────────────────────────────────────────────────
 const ComingSoon = ({ title }) => (
   <div className="min-h-screen flex items-center justify-center">
@@ -1336,9 +1718,9 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/scores" element={<ScoresPage />} />
             <Route path="/best-bets" element={<BestBetsPage />} />
-            <Route path="/league/:slug" element={<ComingSoon title="League Page" />} />
+            <Route path="/league/:slug" element={<LeaguePage />} />
             <Route path="/game/:league/:id" element={<GamePreviewPage />} />
-            <Route path="/team/:league/:id" element={<ComingSoon title="Team Page" />} />
+            <Route path="/team/:league/:id" element={<TeamPage />} />
             <Route path="/player/:id" element={<ComingSoon title="Player Profile" />} />
             <Route path="/login" element={<ComingSoon title="Sign In" />} />
             <Route path="/register" element={<ComingSoon title="Join BounceBackTalk" />} />
