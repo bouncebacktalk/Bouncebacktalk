@@ -2919,7 +2919,7 @@ const HomePage = () => {
 
   return (
     <>
-      <Ticker games={games} />
+      <Ticker games={games.filter(g => g.isLive)} />
       <Hero games={games} />
       <BestBets />
       <TrendingGames />
