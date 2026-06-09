@@ -435,11 +435,11 @@ const Hero = ({ games }) => {
         <div className="grid lg:grid-cols-[1fr_380px] gap-6 items-start">
 
           {/* Main hero article */}
-          <Link to="/game/nba/featured" className="group block relative overflow-hidden rounded-2xl">
+          <Link to="/article/nba-finals-game-2" className="group block relative overflow-hidden rounded-2xl">
             <div className="aspect-[16/9] relative">
               <img
                 src="https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=1600&auto=format&fit=crop"
-                alt="Featured game"
+                alt="NBA Finals Game 2"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -447,20 +447,20 @@ const Hero = ({ games }) => {
             <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8">
               <div className="flex items-center gap-2 mb-3">
                 <span className="bg-[#E21111] text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full tracking-widest flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live Analysis
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> NBA Finals Recap
                 </span>
-                <span className="text-white/50 text-[10px] font-bold uppercase tracking-widest">NBA Finals · Knicks Lead 2-0</span>
+                <span className="text-white/50 text-[10px] font-bold uppercase tracking-widest">NBA Finals · Knicks Lead 2-0 · Game 3 Tonight at MSG</span>
               </div>
               <h1 className="text-3xl md:text-5xl font-black uppercase italic leading-[0.9] text-white mb-3 tracking-tight">
-                Brunson Clutch<br />
-                <span className="text-[#E21111]">Free Throw Seals</span><br />
-                Game 2, Knicks Up 2-0
+                Wemby Misses At<br />
+                <span className="text-[#E21111]">The Buzzer —</span><br />
+                Knicks Steal Game 2
               </h1>
               <p className="text-white/60 text-sm max-w-lg line-clamp-2 leading-relaxed">
-                Jalen Brunson hit the go-ahead free throw with 9.5 seconds left as New York edged San Antonio 105-104 — the Knicks are one win away from the NBA Finals with Game 3 tonight in San Antonio.
+                Brunson hit the go-ahead free throw with 9.5 seconds left, Wembanyama turned it over then missed the game-winner — New York is two wins away from ending a 53-year championship drought.
               </p>
               <div className="mt-4 flex items-center gap-2 text-[#E21111] text-[11px] font-black uppercase tracking-widest">
-                Read Full Analysis <ChevronRight size={14} />
+                Read Full Recap <ChevronRight size={14} />
               </div>
             </div>
           </Link>
@@ -2661,6 +2661,182 @@ const RosterPreview = ({ league, teamId }) => {
 };
 
 // ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
+// ─── NBA FINALS GAME 2 ARTICLE ───────────────────────────────────────────────
+const NBAFinalsGame2Article = () => {
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+  return (
+    <div className="min-h-screen bg-[#0f0f0f] text-[#f0ebe0]">
+      {/* Hero Image */}
+      <div className="relative h-[55vh] overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=1800&auto=format&fit=crop"
+          alt="NBA Finals Game 2"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-black/50 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-8 max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="bg-[#E21111] text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest">NBA Finals</span>
+            <span className="text-white/50 text-xs uppercase tracking-widest font-bold">Game 2 Recap · June 5, 2026</span>
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black uppercase italic leading-[0.9] text-white tracking-tight">
+            Wemby Turns It Over,<br />
+            <span className="text-[#E21111]">Misses The Buzzer —</span><br />
+            Knicks Take 2-0 Lead
+          </h1>
+        </div>
+      </div>
+
+      {/* Article Body */}
+      <div className="max-w-3xl mx-auto px-4 py-12">
+
+        {/* Byline */}
+        <div className="flex items-center gap-4 pb-8 mb-8 border-b border-[#2a2a2a]">
+          <div className="w-10 h-10 rounded-full bg-[#E21111] flex items-center justify-center text-white font-black text-sm">BB</div>
+          <div>
+            <p className="text-[#f0ebe0] font-bold text-sm">BounceBackTalk Staff</p>
+            <p className="text-[#888] text-xs">June 5, 2026 · San Antonio, TX</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2 text-[#888] text-xs font-bold uppercase tracking-widest">
+            <span className="bg-[#1a1a1a] px-3 py-1.5 rounded-full">Frost Bank Center</span>
+            <span className="bg-[#1a1a1a] px-3 py-1.5 rounded-full">19,014 fans</span>
+          </div>
+        </div>
+
+        {/* Final Score Box */}
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6 mb-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/ny.png" className="w-14 h-14" alt="Knicks" />
+            <div>
+              <p className="text-[#888] text-xs uppercase tracking-widest font-bold mb-1">New York Knicks</p>
+              <p className="text-5xl font-black text-[#f0ebe0]">105</p>
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-[#555] text-xs uppercase tracking-widest font-bold mb-1">Final</p>
+            <p className="text-[#888] text-sm font-bold">NY leads series</p>
+            <p className="text-[#E21111] text-xl font-black">2-0</p>
+          </div>
+          <div className="flex items-center gap-4 flex-row-reverse">
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/sa.png" className="w-14 h-14" alt="Spurs" />
+            <div className="text-right">
+              <p className="text-[#888] text-xs uppercase tracking-widest font-bold mb-1">San Antonio Spurs</p>
+              <p className="text-5xl font-black text-[#f0ebe0]">104</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quarter breakdown */}
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 mb-10 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[#555] text-xs uppercase tracking-widest font-bold">
+                <td className="pb-3 pr-4">Team</td>
+                <td className="pb-3 text-center px-3">Q1</td>
+                <td className="pb-3 text-center px-3">Q2</td>
+                <td className="pb-3 text-center px-3">Q3</td>
+                <td className="pb-3 text-center px-3">Q4</td>
+                <td className="pb-3 text-center pl-3 text-[#f0ebe0] font-black">FINAL</td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="text-[#f0ebe0] font-bold">
+                <td className="py-2 pr-4 flex items-center gap-2"><img src="https://a.espncdn.com/i/teamlogos/nba/500/ny.png" className="w-5 h-5" alt="" /> NYK</td>
+                <td className="py-2 text-center px-3">25</td>
+                <td className="py-2 text-center px-3">31</td>
+                <td className="py-2 text-center px-3">28</td>
+                <td className="py-2 text-center px-3">21</td>
+                <td className="py-2 text-center pl-3 text-[#E21111] font-black text-base">105</td>
+              </tr>
+              <tr className="text-[#f0ebe0] font-bold">
+                <td className="py-2 pr-4 flex items-center gap-2"><img src="https://a.espncdn.com/i/teamlogos/nba/500/sa.png" className="w-5 h-5" alt="" /> SAS</td>
+                <td className="py-2 text-center px-3">34</td>
+                <td className="py-2 text-center px-3">18</td>
+                <td className="py-2 text-center px-3">23</td>
+                <td className="py-2 text-center px-3">29</td>
+                <td className="py-2 text-center pl-3 font-black text-base">104</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Lede */}
+        <p className="text-xl md:text-2xl font-bold leading-relaxed text-[#f0ebe0] mb-8 border-l-4 border-[#E21111] pl-6">
+          Go crazy, New York. The red-hot Knicks are going home two wins away from an NBA championship the city has been waiting to see for generations.
+        </p>
+
+        <p className="text-[#bbb] leading-relaxed text-base mb-6">
+          Jalen Brunson hit a go-ahead free throw with 9.5 seconds left after a Victor Wembanyama turnover moments earlier, then Wembanyama missed a jumper at the buzzer as New York escaped Frost Bank Center with a 105-104 win over the San Antonio Spurs on Friday night — taking a commanding 2-0 lead in the NBA Finals.
+        </p>
+
+        <p className="text-[#bbb] leading-relaxed text-base mb-6">
+          Karl-Anthony Towns stuffed the stat sheet with 21 points and 13 rebounds. Brunson and Mikal Bridges each scored 20 for the Knicks, who have now won 13 straight playoff games — the second-longest streak in NBA playoff history.
+        </p>
+
+        {/* Pull Quote */}
+        <blockquote className="my-10 bg-[#1a1a1a] border-l-4 border-[#E21111] rounded-r-xl p-6">
+          <p className="text-[#f0ebe0] text-xl font-black italic leading-snug mb-3">"We've been in this situation before. Nobody panicked."</p>
+          <cite className="text-[#888] text-sm font-bold uppercase tracking-widest not-italic">— Jalen Brunson, after Game 2</cite>
+        </blockquote>
+
+        <p className="text-[#bbb] leading-relaxed text-base mb-6">
+          New York is now just the third team in Finals history to win the first two games on the road, joining Michael Jordan's 1993 Chicago Bulls and Hakeem Olajuwon's 1995 Houston Rockets. Both of those teams went on to win championships.
+        </p>
+
+        {/* Stats Grid */}
+        <div className="my-10">
+          <h2 className="text-[11px] font-black uppercase tracking-widest text-[#888] mb-4">Game Leaders</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[
+              { team: 'NYK', name: 'Karl-Anthony Towns', line: '21 PTS · 13 REB · 3 AST', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ny.png' },
+              { team: 'NYK', name: 'Jalen Brunson', line: '20 PTS · 8 AST · 6 REB', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ny.png' },
+              { team: 'NYK', name: 'Mikal Bridges', line: '20 PTS · 5 REB · 4 AST', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ny.png' },
+              { team: 'SAS', name: 'Victor Wembanyama', line: '29 PTS · 8 REB · 4 BLK', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/sa.png' },
+              { team: 'SAS', name: "De'Aaron Fox", line: '20 PTS · 7 AST · 3 STL', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/sa.png' },
+            ].map(p => (
+              <div key={p.name} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 flex items-center gap-4">
+                <img src={p.logo} className="w-8 h-8 opacity-70" alt={p.team} />
+                <div>
+                  <p className="text-[#f0ebe0] font-black text-sm">{p.name}</p>
+                  <p className="text-[#888] text-xs font-bold tracking-wide">{p.line}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-[#bbb] leading-relaxed text-base mb-6">
+          Wembanyama was largely quiet in the first half but put San Antonio on his back in the fourth quarter, finishing with 29 points. His three-point play with 57 seconds left gave the Spurs their first lead in nearly two quarters, 104-102. The arena erupted — and then, in the span of 48 seconds, it all fell apart.
+        </p>
+
+        <p className="text-[#bbb] leading-relaxed text-base mb-6">
+          Brunson answered with a mid-range jumper to tie it. Wembanyama missed a long two. OG Anunoby grabbed the rebound with 30 seconds left, the Knicks called time. The Spurs forced a stop, but Wembanyama threw the inbound pass away. Brunson drew the foul, hit both free throws, and before long Spurs fans were filing out — possibly for the last time this season.
+        </p>
+
+        <p className="text-[#bbb] leading-relaxed text-base mb-6">
+          The Spurs called their final timeout with 7.5 seconds left. Fox took the inbound, set up Wembanyama at the elbow. The shot went up, rattled off the rim, and it was over.
+        </p>
+
+        {/* Divider */}
+        <div className="border-t border-[#2a2a2a] my-10" />
+
+        <h2 className="text-2xl font-black uppercase italic text-[#f0ebe0] mb-4">What's Next</h2>
+        <p className="text-[#bbb] leading-relaxed text-base mb-6">
+          The series shifts to Madison Square Garden for Game 3 on Monday night. President Trump — a native New Yorker — is expected in attendance, and secondary market tickets for the worst seats at MSG were approaching $9,000 on Friday night. The Knicks haven't won a championship since 1973.
+        </p>
+        <p className="text-[#bbb] leading-relaxed text-base mb-8">
+          For the Spurs, the window to respond is now. Victor Wembanyama, 22 years old and already one of the most dominant players on the planet, needs a defining performance on the road — or this series could be over before it ever gets back to San Antonio.
+        </p>
+
+        {/* Back link */}
+        <Link to="/" className="inline-flex items-center gap-2 text-[#E21111] text-[11px] font-black uppercase tracking-widest hover:text-red-400 transition-colors">
+          <ChevronRight size={12} className="rotate-180" /> Back to Home
+        </Link>
+      </div>
+    </div>
+  );
+};
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const [email, setEmail]       = useState('');
@@ -3065,6 +3241,7 @@ export default function App() {
             <Route path="/game/:league/:id" element={<GamePreviewPage />} />
             <Route path="/team/:league/:id" element={<TeamPage />} />
             <Route path="/player/:id" element={<PlayerPage />} />
+            <Route path="/article/nba-finals-game-2" element={<NBAFinalsGame2Article />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Routes>
