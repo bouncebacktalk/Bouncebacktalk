@@ -1641,6 +1641,223 @@ const calcPayout = (wager, odds) => {
   return o > 0 ? wager * (o / 100) : wager * (100 / Math.abs(o));
 };
 
+// ─── ALL SPORTS TEAMS (NBA + NFL + MLB + NHL) ──────────────────────────────
+const ALL_SPORTS_TEAMS = [
+  // NBA
+  { abbr: 'ATL', name: 'Atlanta Hawks',          sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/atl.png' },
+  { abbr: 'BOS', name: 'Boston Celtics',          sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/bos.png' },
+  { abbr: 'BKN', name: 'Brooklyn Nets',           sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/bkn.png' },
+  { abbr: 'CHA', name: 'Charlotte Hornets',       sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/cha.png' },
+  { abbr: 'CHI', name: 'Chicago Bulls',           sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/chi.png' },
+  { abbr: 'CLE', name: 'Cleveland Cavaliers',     sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/cle.png' },
+  { abbr: 'DAL', name: 'Dallas Mavericks',        sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/dal.png' },
+  { abbr: 'DEN', name: 'Denver Nuggets',          sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/den.png' },
+  { abbr: 'DET', name: 'Detroit Pistons',         sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/det.png' },
+  { abbr: 'GSW', name: 'Golden State Warriors',   sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/gs.png' },
+  { abbr: 'HOU', name: 'Houston Rockets',         sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/hou.png' },
+  { abbr: 'IND', name: 'Indiana Pacers',          sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ind.png' },
+  { abbr: 'LAC', name: 'LA Clippers',             sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/lac.png' },
+  { abbr: 'LAL', name: 'LA Lakers',               sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/lal.png' },
+  { abbr: 'MEM', name: 'Memphis Grizzlies',       sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/mem.png' },
+  { abbr: 'MIA', name: 'Miami Heat',              sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/mia.png' },
+  { abbr: 'MIL', name: 'Milwaukee Bucks',         sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/mil.png' },
+  { abbr: 'MIN', name: 'Minnesota Timberwolves',  sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/min.png' },
+  { abbr: 'NOP', name: 'New Orleans Pelicans',    sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/no.png' },
+  { abbr: 'NYK', name: 'New York Knicks',         sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ny.png' },
+  { abbr: 'OKC', name: 'OKC Thunder',             sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/okc.png' },
+  { abbr: 'ORL', name: 'Orlando Magic',           sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/orl.png' },
+  { abbr: 'PHI', name: 'Philadelphia 76ers',      sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/phi.png' },
+  { abbr: 'PHX', name: 'Phoenix Suns',            sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/phx.png' },
+  { abbr: 'POR', name: 'Portland Trail Blazers',  sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/por.png' },
+  { abbr: 'SAC', name: 'Sacramento Kings',        sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/sac.png' },
+  { abbr: 'SAS', name: 'San Antonio Spurs',       sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/sa.png' },
+  { abbr: 'TOR', name: 'Toronto Raptors',         sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/tor.png' },
+  { abbr: 'UTA', name: 'Utah Jazz',               sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/utah.png' },
+  { abbr: 'WAS', name: 'Washington Wizards',      sport: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/wsh.png' },
+  // NFL
+  { abbr: 'ARI', name: 'Arizona Cardinals',       sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/ari.png' },
+  { abbr: 'ATL', name: 'Atlanta Falcons',         sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/atl.png' },
+  { abbr: 'BAL', name: 'Baltimore Ravens',        sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/bal.png' },
+  { abbr: 'BUF', name: 'Buffalo Bills',           sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png' },
+  { abbr: 'CAR', name: 'Carolina Panthers',       sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/car.png' },
+  { abbr: 'CHI', name: 'Chicago Bears',           sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/chi.png' },
+  { abbr: 'CIN', name: 'Cincinnati Bengals',      sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/cin.png' },
+  { abbr: 'CLE', name: 'Cleveland Browns',        sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/cle.png' },
+  { abbr: 'DAL', name: 'Dallas Cowboys',          sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/dal.png' },
+  { abbr: 'DEN', name: 'Denver Broncos',          sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/den.png' },
+  { abbr: 'DET', name: 'Detroit Lions',           sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/det.png' },
+  { abbr: 'GB',  name: 'Green Bay Packers',       sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/gb.png' },
+  { abbr: 'HOU', name: 'Houston Texans',          sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/hou.png' },
+  { abbr: 'IND', name: 'Indianapolis Colts',      sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/ind.png' },
+  { abbr: 'JAX', name: 'Jacksonville Jaguars',    sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/jax.png' },
+  { abbr: 'KC',  name: 'Kansas City Chiefs',      sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/kc.png' },
+  { abbr: 'LAC', name: 'LA Chargers',             sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/lac.png' },
+  { abbr: 'LAR', name: 'LA Rams',                 sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/lar.png' },
+  { abbr: 'LV',  name: 'Las Vegas Raiders',       sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/lv.png' },
+  { abbr: 'MIA', name: 'Miami Dolphins',          sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/mia.png' },
+  { abbr: 'MIN', name: 'Minnesota Vikings',       sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/min.png' },
+  { abbr: 'NE',  name: 'New England Patriots',    sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/ne.png' },
+  { abbr: 'NO',  name: 'New Orleans Saints',      sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/no.png' },
+  { abbr: 'NYG', name: 'New York Giants',         sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png' },
+  { abbr: 'NYJ', name: 'New York Jets',           sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png' },
+  { abbr: 'PHI', name: 'Philadelphia Eagles',     sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png' },
+  { abbr: 'PIT', name: 'Pittsburgh Steelers',     sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/pit.png' },
+  { abbr: 'SEA', name: 'Seattle Seahawks',        sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/sea.png' },
+  { abbr: 'SF',  name: 'San Francisco 49ers',     sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/sf.png' },
+  { abbr: 'TB',  name: 'Tampa Bay Buccaneers',    sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/tb.png' },
+  { abbr: 'TEN', name: 'Tennessee Titans',        sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/ten.png' },
+  { abbr: 'WSH', name: 'Washington Commanders',   sport: 'NFL', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/wsh.png' },
+  // MLB
+  { abbr: 'ARI', name: 'Arizona Diamondbacks',    sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/ari.png' },
+  { abbr: 'ATL', name: 'Atlanta Braves',          sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/atl.png' },
+  { abbr: 'BAL', name: 'Baltimore Orioles',       sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/bal.png' },
+  { abbr: 'BOS', name: 'Boston Red Sox',          sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/bos.png' },
+  { abbr: 'CHC', name: 'Chicago Cubs',            sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/chc.png' },
+  { abbr: 'CWS', name: 'Chicago White Sox',       sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/cws.png' },
+  { abbr: 'CIN', name: 'Cincinnati Reds',         sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/cin.png' },
+  { abbr: 'CLE', name: 'Cleveland Guardians',     sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/cle.png' },
+  { abbr: 'COL', name: 'Colorado Rockies',        sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/col.png' },
+  { abbr: 'DET', name: 'Detroit Tigers',          sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/det.png' },
+  { abbr: 'HOU', name: 'Houston Astros',          sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/hou.png' },
+  { abbr: 'KC',  name: 'Kansas City Royals',      sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/kc.png' },
+  { abbr: 'LAA', name: 'LA Angels',               sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/laa.png' },
+  { abbr: 'LAD', name: 'LA Dodgers',              sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/lad.png' },
+  { abbr: 'MIA', name: 'Miami Marlins',           sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/mia.png' },
+  { abbr: 'MIL', name: 'Milwaukee Brewers',       sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/mil.png' },
+  { abbr: 'MIN', name: 'Minnesota Twins',         sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/min.png' },
+  { abbr: 'NYM', name: 'New York Mets',           sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/nym.png' },
+  { abbr: 'NYY', name: 'New York Yankees',        sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/nyy.png' },
+  { abbr: 'OAK', name: 'Oakland Athletics',       sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/oak.png' },
+  { abbr: 'PHI', name: 'Philadelphia Phillies',   sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/phi.png' },
+  { abbr: 'PIT', name: 'Pittsburgh Pirates',      sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/pit.png' },
+  { abbr: 'SD',  name: 'San Diego Padres',        sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/sd.png' },
+  { abbr: 'SF',  name: 'San Francisco Giants',    sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/sf.png' },
+  { abbr: 'SEA', name: 'Seattle Mariners',        sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/sea.png' },
+  { abbr: 'STL', name: 'St. Louis Cardinals',     sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/stl.png' },
+  { abbr: 'TB',  name: 'Tampa Bay Rays',          sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/tb.png' },
+  { abbr: 'TEX', name: 'Texas Rangers',           sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/tex.png' },
+  { abbr: 'TOR', name: 'Toronto Blue Jays',       sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/tor.png' },
+  { abbr: 'WSH', name: 'Washington Nationals',    sport: 'MLB', logo: 'https://a.espncdn.com/i/teamlogos/mlb/500/wsh.png' },
+  // NHL
+  { abbr: 'ANA', name: 'Anaheim Ducks',           sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/ana.png' },
+  { abbr: 'ARI', name: 'Utah Hockey Club',        sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/ari.png' },
+  { abbr: 'BOS', name: 'Boston Bruins',           sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/bos.png' },
+  { abbr: 'BUF', name: 'Buffalo Sabres',          sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/buf.png' },
+  { abbr: 'CAR', name: 'Carolina Hurricanes',     sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/car.png' },
+  { abbr: 'CBJ', name: 'Columbus Blue Jackets',   sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/cbj.png' },
+  { abbr: 'CGY', name: 'Calgary Flames',          sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/cgy.png' },
+  { abbr: 'CHI', name: 'Chicago Blackhawks',      sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/chi.png' },
+  { abbr: 'COL', name: 'Colorado Avalanche',      sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/col.png' },
+  { abbr: 'DAL', name: 'Dallas Stars',            sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/dal.png' },
+  { abbr: 'DET', name: 'Detroit Red Wings',       sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/det.png' },
+  { abbr: 'EDM', name: 'Edmonton Oilers',         sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/edm.png' },
+  { abbr: 'FLA', name: 'Florida Panthers',        sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/fla.png' },
+  { abbr: 'LA',  name: 'LA Kings',                sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/la.png' },
+  { abbr: 'MIN', name: 'Minnesota Wild',          sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/min.png' },
+  { abbr: 'MTL', name: 'Montreal Canadiens',      sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/mtl.png' },
+  { abbr: 'NJ',  name: 'New Jersey Devils',       sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nj.png' },
+  { abbr: 'NSH', name: 'Nashville Predators',     sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nsh.png' },
+  { abbr: 'NYI', name: 'New York Islanders',      sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nyi.png' },
+  { abbr: 'NYR', name: 'New York Rangers',        sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/nyr.png' },
+  { abbr: 'OTT', name: 'Ottawa Senators',         sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/ott.png' },
+  { abbr: 'PHI', name: 'Philadelphia Flyers',     sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/phi.png' },
+  { abbr: 'PIT', name: 'Pittsburgh Penguins',     sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/pit.png' },
+  { abbr: 'SEA', name: 'Seattle Kraken',          sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/sea.png' },
+  { abbr: 'SJS', name: 'San Jose Sharks',         sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/sjs.png' },
+  { abbr: 'STL', name: 'St. Louis Blues',         sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/stl.png' },
+  { abbr: 'TB',  name: 'Tampa Bay Lightning',     sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/tb.png' },
+  { abbr: 'TOR', name: 'Toronto Maple Leafs',     sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/tor.png' },
+  { abbr: 'VAN', name: 'Vancouver Canucks',       sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/van.png' },
+  { abbr: 'VGK', name: 'Vegas Golden Knights',    sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/vgk.png' },
+  { abbr: 'WPG', name: 'Winnipeg Jets',           sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/wpg.png' },
+  { abbr: 'WSH', name: 'Washington Capitals',     sport: 'NHL', logo: 'https://a.espncdn.com/i/teamlogos/nhl/500/wsh.png' },
+];
+
+// ─── TEAM SEARCH INPUT ───────────────────────────────────────────────────────
+const TeamSearchInput = ({ value, onChange, placeholder = 'Search team...', small = false }) => {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = ALL_SPORTS_TEAMS.find(t => t.name === value);
+
+  // close on outside click
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = query.trim().length < 1
+    ? []
+    : ALL_SPORTS_TEAMS.filter(t =>
+        t.name.toLowerCase().includes(query.toLowerCase()) ||
+        t.abbr.toLowerCase().includes(query.toLowerCase()) ||
+        t.sport.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 8);
+
+  const inputBase = small
+    ? "w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#E21111] rounded-xl px-3 py-2 text-[#f0ebe0] text-xs placeholder-[#444] outline-none transition-colors"
+    : "w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#E21111] rounded-xl px-3 py-2.5 text-[#f0ebe0] text-sm placeholder-[#444] outline-none transition-colors";
+
+  return (
+    <div ref={ref} className="relative">
+      {selected ? (
+        // Selected state — show logo + name pill with clear button
+        <div className={`flex items-center gap-2 bg-[#141414] border border-[#E21111]/40 rounded-xl px-3 ${small ? 'py-1.5' : 'py-2'}`}>
+          <img src={selected.logo} alt={selected.name} className={`${small ? 'w-5 h-5' : 'w-6 h-6'} object-contain flex-shrink-0`}
+            onError={e => { e.target.style.display = 'none'; }} />
+          <span className={`text-[#f0ebe0] font-bold flex-1 truncate ${small ? 'text-xs' : 'text-sm'}`}>{selected.name}</span>
+          <span className={`text-[#555] ${small ? 'text-[9px]' : 'text-[10px]'} font-black uppercase`}>{selected.sport}</span>
+          <button type="button" onClick={() => { onChange(''); setQuery(''); }}
+            className="text-[#444] hover:text-[#E21111] transition-colors ml-1 flex-shrink-0">
+            <XIcon size={small ? 12 : 14} />
+          </button>
+        </div>
+      ) : (
+        // Search input
+        <input
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className={inputBase}
+        />
+      )}
+
+      {/* Dropdown */}
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden shadow-2xl shadow-black/60">
+          {filtered.map(team => (
+            <button
+              key={`${team.sport}-${team.abbr}-${team.name}`}
+              type="button"
+              onMouseDown={e => {
+                e.preventDefault();
+                onChange(team.name);
+                setQuery('');
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#252525] transition-colors text-left"
+            >
+              <img src={team.logo} alt={team.name} className="w-7 h-7 object-contain flex-shrink-0"
+                onError={e => { e.target.style.display = 'none'; }} />
+              <span className="text-[#f0ebe0] text-sm font-bold flex-1">{team.name}</span>
+              <span className="text-[#444] text-[9px] font-black uppercase tracking-wider bg-[#2a2a2a] px-1.5 py-0.5 rounded-full">{team.sport}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* No results hint */}
+      {open && query.length > 0 && filtered.length === 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-3 text-[#555] text-xs text-center">
+          No teams found for "{query}"
+        </div>
+      )}
+    </div>
+  );
+};
+
 const BetTracker = () => {
   const [myBets, setMyBets] = useState(getStoredBets);
   const [mode, setMode] = useState(null); // null | 'straight' | 'parlay'
@@ -1768,7 +1985,7 @@ const BetTracker = () => {
             </div>
             <div>
               <label className={labelCls}>Your Pick</label>
-              <input value={sbPick} onChange={e => setSbPick(e.target.value)} placeholder="e.g. Knicks -4.5" className={inputCls} />
+              <TeamSearchInput value={sbPick} onChange={setSbPick} placeholder="Search team (e.g. Knicks)" />
             </div>
             <div>
               <label className={labelCls}>Odds (American)</label>
@@ -1820,8 +2037,12 @@ const BetTracker = () => {
                     </select>
                   )}
                 </div>
-                <input value={leg.pick} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, pick: e.target.value } : l))}
-                  placeholder="Pick" className={inputCls + ' text-xs'} />
+                <TeamSearchInput
+                  value={leg.pick}
+                  onChange={val => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, pick: val } : l))}
+                  placeholder="Search team..."
+                  small={true}
+                />
                 <input value={leg.odds} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, odds: e.target.value } : l))}
                   placeholder="Odds (-110)" className={inputCls + ' text-xs'} />
               </div>
