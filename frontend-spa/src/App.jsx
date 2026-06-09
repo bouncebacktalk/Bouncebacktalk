@@ -709,53 +709,115 @@ const BestBets = () => {
   );
 };
 
-// ─── TRENDING GAMES ───────────────────────────────────────────────────────────
-const TRENDING = [
-  { id: 't1', league: 'NBA', teams: 'OKC vs IND', label: 'NBA Finals Game 3', views: '142K', hot: true, img: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=400&auto=format&fit=crop' },
-  { id: 't2', league: 'MLB', teams: 'NYY vs BOS', label: 'Rivalry Weekend', views: '89K', hot: true, img: 'https://images.unsplash.com/photo-1566577134770-3d85bb3a9cc4?q=80&w=400&auto=format&fit=crop' },
-  { id: 't3', league: 'NHL', teams: 'FLA vs EDM', label: 'Stanley Cup Finals', views: '67K', hot: false, img: 'https://images.unsplash.com/photo-1515703407324-5f753afd8be8?q=80&w=400&auto=format&fit=crop' },
-  { id: 't4', league: 'NFL', teams: 'KC vs LV', label: 'Preseason Buzz', views: '54K', hot: false, img: 'https://images.unsplash.com/photo-1508098682722-e99c643e7f0b?q=80&w=400&auto=format&fit=crop' },
+// ─── TRENDING NEWS ────────────────────────────────────────────────────────────
+const TREND_SOURCES = [
+  { league: 'NBA', sport: 'basketball', slug: 'nba' },
+  { league: 'NFL', sport: 'football',   slug: 'nfl' },
+  { league: 'MLB', sport: 'baseball',   slug: 'mlb' },
+  { league: 'NHL', sport: 'hockey',     slug: 'nhl' },
 ];
 
-const TrendingGames = () => (
-  <section className="max-w-7xl mx-auto px-4 py-10 border-t border-[#1a1a1a]">
-    <div className="flex items-center gap-3 mb-6">
-      <div className="w-1 h-6 bg-[#E21111] rounded-full" />
-      <h2 className="text-xl font-black uppercase tracking-tight text-[#f0ebe0]">Trending Now</h2>
-      <FireIcon size={16} className="text-orange-400" />
-    </div>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {TRENDING.map((g, i) => (
-        <Link key={g.id} to={`/game/${g.league.toLowerCase()}/${g.id}`}
-          className="group relative rounded-xl overflow-hidden block">
-          <div className="aspect-[4/3] relative">
-            <img src={g.img} alt={g.teams} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-          </div>
-          <div className="absolute inset-0 p-3 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="bg-black/50 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-[#888] px-2 py-0.5 rounded-full">
-                {g.league}
-              </span>
-              {g.hot && (
-                <span className="bg-orange-500/80 backdrop-blur-sm text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
-                  🔥 Hot
-                </span>
-              )}
-            </div>
-            <div>
-              <div className="text-[#f0ebe0] font-black text-sm leading-tight mb-0.5">{g.teams}</div>
-              <div className="text-white/50 text-[10px]">{g.views} views</div>
-            </div>
-          </div>
-          <div className="absolute top-3 left-3 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center text-[9px] font-black text-white">
-            {i + 1}
-          </div>
-        </Link>
-      ))}
-    </div>
-  </section>
-);
+const TrendingGames = () => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const results = await Promise.allSettled(
+          TREND_SOURCES.map(s =>
+            fetch(`https://site.api.espn.com/apis/site/v2/sports/${s.sport}/${s.slug}/news?limit=3`)
+              .then(r => r.json())
+              .then(d => (d.articles || []).slice(0, 3).map((a, idx) => ({
+                id: `${s.slug}-${idx}`,
+                league: s.league,
+                headline: a.headline,
+                img: a.images?.[0]?.url || null,
+                link: a.links?.web?.href || null,
+                hot: idx === 0,
+              })))
+          )
+        );
+        // Interleave: take top story from each league, then second, etc.
+        const buckets = results
+          .filter(r => r.status === 'fulfilled')
+          .map(r => r.value);
+        const merged = [];
+        for (let i = 0; i < 3; i++) {
+          buckets.forEach(b => { if (b[i]) merged.push(b[i]); });
+        }
+        setItems(merged.slice(0, 8));
+      } catch (e) {
+        console.error('Trending fetch failed', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const FALLBACK_IMGS = {
+    NBA: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=400&auto=format&fit=crop',
+    NFL: 'https://images.unsplash.com/photo-1508098682722-e99c643e7f0b?q=80&w=400&auto=format&fit=crop',
+    MLB: 'https://images.unsplash.com/photo-1566577134770-3d85bb3a9cc4?q=80&w=400&auto=format&fit=crop',
+    NHL: 'https://images.unsplash.com/photo-1515703407324-5f753afd8be8?q=80&w=400&auto=format&fit=crop',
+  };
+
+  return (
+    <section className="max-w-7xl mx-auto px-4 py-10 border-t border-[#1a1a1a]">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-1 h-6 bg-[#E21111] rounded-full" />
+        <h2 className="text-xl font-black uppercase tracking-tight text-[#f0ebe0]">Trending Now</h2>
+        <FireIcon size={16} className="text-orange-400" />
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="aspect-[4/3] rounded-xl bg-[#1a1a1a] animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {items.map((g, i) => {
+            const imgSrc = g.img || FALLBACK_IMGS[g.league];
+            const card = (
+              <div className="group relative rounded-xl overflow-hidden block cursor-pointer h-full">
+                <div className="aspect-[4/3] relative">
+                  <img src={imgSrc} alt={g.headline} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+                </div>
+                <div className="absolute inset-0 p-3 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="bg-black/60 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-[#aaa] px-2 py-0.5 rounded-full">
+                      {g.league}
+                    </span>
+                    {g.hot && (
+                      <span className="bg-orange-500/80 backdrop-blur-sm text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
+                        🔥 Hot
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[#f0ebe0] font-black text-xs leading-tight line-clamp-3">
+                    {g.headline}
+                  </p>
+                </div>
+                <div className="absolute top-3 left-3 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center text-[9px] font-black text-white">
+                  {i + 1}
+                </div>
+              </div>
+            );
+            return g.link ? (
+              <a key={g.id} href={g.link} target="_blank" rel="noopener noreferrer">{card}</a>
+            ) : (
+              <div key={g.id}>{card}</div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+};
 
 // ─── LEAGUE STRIP ─────────────────────────────────────────────────────────────
 const LeagueStrip = () => (
