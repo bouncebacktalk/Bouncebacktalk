@@ -1863,25 +1863,36 @@ const BetTracker = () => {
   const [mode, setMode] = useState(null); // null | 'straight' | 'parlay'
   const [games, setGames] = useState([]);
   const [loadingGames, setLoadingGames] = useState(false);
+  const [liveGames, setLiveGames] = useState([]); // always-fresh scores for progress tracking
 
   // Straight bet form
   const [sbGame, setSbGame] = useState('');
   const [sbPick, setSbPick] = useState('');
+  const [sbLine, setSbLine] = useState(''); // spread/line e.g. -4.5, +3, ML
   const [sbOdds, setSbOdds] = useState('');
   const [sbWager, setSbWager] = useState('');
   const [sbNote, setSbNote] = useState('');
 
   // Parlay form
-  const [plLegs, setPlLegs] = useState([{ game: '', pick: '', odds: '' }]);
+  const [plLegs, setPlLegs] = useState([{ game: '', pick: '', line: '', odds: '' }]);
   const [plOdds, setPlOdds] = useState('');
   const [plWager, setPlWager] = useState('');
 
+  // Fetch games when form opens
   useEffect(() => {
     if (mode && games.length === 0) {
       setLoadingGames(true);
       fetchScores().then(g => { setGames(g); setLoadingGames(false); });
     }
   }, [mode]);
+
+  // Always fetch live scores for progress bars, refresh every 60s
+  useEffect(() => {
+    const load = () => fetchScores().then(setLiveGames).catch(() => {});
+    load();
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, []);
 
   const persist = (updated) => { saveStoredBets(updated); setMyBets(updated); };
 
@@ -1892,11 +1903,11 @@ const BetTracker = () => {
     persist([...myBets, {
       id: Date.now(), type: 'straight', createdAt: new Date().toISOString(),
       game: game ? `${game.away.name} @ ${game.home.name}` : sbGame,
-      gameId: sbGame, pick: sbPick, odds: sbOdds,
+      gameId: sbGame, pick: sbPick, line: sbLine, odds: sbOdds,
       wager: parseFloat(sbWager), payout: +payout.toFixed(2),
       note: sbNote, result: 'pending'
     }]);
-    setSbGame(''); setSbPick(''); setSbOdds(''); setSbWager(''); setSbNote('');
+    setSbGame(''); setSbPick(''); setSbLine(''); setSbOdds(''); setSbWager(''); setSbNote('');
     setMode(null);
   };
 
@@ -1907,11 +1918,11 @@ const BetTracker = () => {
       id: Date.now(), type: 'parlay', createdAt: new Date().toISOString(),
       legs: plLegs.map(l => {
         const g = games.find(gm => gm.id === l.game);
-        return { game: g ? `${g.away.name} @ ${g.home.name}` : l.game, pick: l.pick, odds: l.odds };
+        return { game: g ? `${g.away.name} @ ${g.home.name}` : l.game, pick: l.pick, line: l.line, odds: l.odds };
       }),
       odds: plOdds, wager: parseFloat(plWager), payout: +payout.toFixed(2), result: 'pending'
     }]);
-    setPlLegs([{ game: '', pick: '', odds: '' }]); setPlOdds(''); setPlWager('');
+    setPlLegs([{ game: '', pick: '', line: '', odds: '' }]); setPlOdds(''); setPlWager('');
     setMode(null);
   };
 
@@ -1988,6 +1999,10 @@ const BetTracker = () => {
               <TeamSearchInput value={sbPick} onChange={setSbPick} placeholder="Search team (e.g. Knicks)" />
             </div>
             <div>
+              <label className={labelCls}>Line / Spread</label>
+              <input value={sbLine} onChange={e => setSbLine(e.target.value)} placeholder="-4.5 · +3 · ML · O/U 224.5" className={inputCls} />
+            </div>
+            <div>
               <label className={labelCls}>Odds (American)</label>
               <input value={sbOdds} onChange={e => setSbOdds(e.target.value)} placeholder="-110" className={inputCls} />
             </div>
@@ -2028,8 +2043,8 @@ const BetTracker = () => {
                   <button onClick={() => setPlLegs(plLegs.filter((_, j) => j !== i))} className="text-[#555] hover:text-[#E21111]"><XIcon size={12} /></button>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div className="sm:col-span-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                <div>
                   {loadingGames ? <div className="h-9 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg animate-pulse" /> : (
                     <select value={leg.game} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, game: e.target.value } : l))} className={inputCls + ' text-xs'}>
                       <option value="">Game (opt)</option>
@@ -2043,6 +2058,10 @@ const BetTracker = () => {
                   placeholder="Search team..."
                   small={true}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input value={leg.line} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, line: e.target.value } : l))}
+                  placeholder="Line (-4.5 / ML)" className={inputCls + ' text-xs'} />
                 <input value={leg.odds} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, odds: e.target.value } : l))}
                   placeholder="Odds (-110)" className={inputCls + ' text-xs'} />
               </div>
@@ -2103,7 +2122,10 @@ const BetTracker = () => {
 
                 {bet.type === 'straight' ? (
                   <div>
-                    <div className="text-[#f0ebe0] font-black text-base mb-0.5">{bet.pick}</div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <div className="text-[#f0ebe0] font-black text-base">{bet.pick}</div>
+                      {bet.line && <span className="text-[#E21111] text-xs font-black bg-[#E21111]/10 px-1.5 py-0.5 rounded-md">{bet.line}</span>}
+                    </div>
                     {bet.game && <div className="text-[#555] text-xs mb-1">{bet.game}</div>}
                     {bet.note && <div className="text-[#888] text-xs italic mb-1">"{bet.note}"</div>}
                     <div className="flex items-center gap-4 text-xs mt-2">
@@ -2111,18 +2133,130 @@ const BetTracker = () => {
                       <span className="text-[#555]">Wagered <span className="text-[#888] font-bold">${bet.wager}</span></span>
                       <span className="text-[#555]">To Win <span className="text-green-400 font-bold">${bet.payout}</span></span>
                     </div>
+                    {/* Live progress tracker */}
+                    {bet.result === 'pending' && (() => {
+                      const pick = bet.pick?.toLowerCase() || '';
+                      const lg = liveGames.find(g =>
+                        g.away.name?.toLowerCase().includes(pick.split(' ').pop()) ||
+                        g.home.name?.toLowerCase().includes(pick.split(' ').pop())
+                      );
+                      if (!lg) return null;
+                      const isPickHome = lg.home.name?.toLowerCase().includes(pick.split(' ').pop());
+                      const pickScore = parseInt(isPickHome ? lg.home.score : lg.away.score) || 0;
+                      const oppScore  = parseInt(isPickHome ? lg.away.score : lg.home.score) || 0;
+                      const margin = pickScore - oppScore;
+                      const lineVal = parseFloat(bet.line);
+                      const isOU = bet.line?.toUpperCase().includes('O') || bet.line?.toUpperCase().includes('U');
+                      const isMl = !bet.line || bet.line?.toUpperCase() === 'ML' || isNaN(lineVal);
+                      const gameActive = lg.isLive || lg.isFinal;
+                      if (!gameActive) return null;
+
+                      // Determine status text + bar fill
+                      let statusText, barColor, barPct, emoji;
+                      if (isOU) {
+                        const total = pickScore + oppScore;
+                        const target = parseFloat(bet.line?.replace(/[OU]/i, '')) || 0;
+                        const isOver = bet.line?.toUpperCase().startsWith('O');
+                        const diff = isOver ? total - target : target - total;
+                        barPct = Math.min(100, Math.max(0, (total / (target || 1)) * 100));
+                        if (diff >= 0) { statusText = `${isOver ? 'OVER' : 'UNDER'} HIT · Total ${total}`; barColor = 'bg-green-400'; emoji = '🎯'; }
+                        else { statusText = `Total ${total} · Need ${Math.abs(diff).toFixed(1)} more`; barColor = 'bg-yellow-400'; emoji = '⏳'; }
+                      } else if (isMl) {
+                        barPct = margin > 0 ? Math.min(100, 50 + margin * 3) : Math.max(0, 50 + margin * 3);
+                        if (margin > 0) { statusText = `LEADING +${margin}`; barColor = 'bg-green-400'; emoji = '🔥'; }
+                        else if (margin === 0) { statusText = 'TIED'; barColor = 'bg-yellow-400'; emoji = '⚖️'; }
+                        else { statusText = `TRAILING ${margin}`; barColor = 'bg-[#E21111]'; emoji = '😬'; }
+                      } else {
+                        // Spread bet: pick needs to win by lineVal (negative = fav, positive = dog)
+                        const needed = -lineVal; // e.g. -4.5 means need to win by 4.5
+                        const covering = margin >= needed;
+                        const diff = margin - needed;
+                        barPct = covering
+                          ? Math.min(100, 50 + diff * 5)
+                          : Math.max(0, 50 - Math.abs(diff) * 5);
+                        if (covering) { statusText = `COVERING · +${diff.toFixed(1)}`; barColor = 'bg-green-400'; emoji = '✅'; }
+                        else { statusText = `NEED ${Math.abs(diff).toFixed(1)} MORE`; barColor = 'bg-yellow-400'; emoji = '⚠️'; }
+                      }
+                      return (
+                        <div className="mt-3 bg-[#141414] border border-[#252525] rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {lg.isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#E21111] animate-pulse flex-shrink-0" />}
+                              <span className="text-[#555] text-[9px] font-black uppercase tracking-widest">
+                                {lg.isLive ? `LIVE · ${lg.statusText}` : 'FINAL'}
+                              </span>
+                            </div>
+                            <span className="text-[10px]">{emoji}</span>
+                          </div>
+                          {/* Score row */}
+                          <div className="flex items-center justify-center gap-3 mb-2.5">
+                            <div className="text-center">
+                              {lg.away.logo && <img src={lg.away.logo} className="w-5 h-5 object-contain mx-auto mb-0.5" alt="" />}
+                              <div className="text-[#888] text-[9px] font-black uppercase">{lg.away.abbr || lg.away.name?.split(' ').pop()}</div>
+                              <div className="text-[#f0ebe0] font-black text-lg leading-none">{lg.away.score || '0'}</div>
+                            </div>
+                            <div className="text-[#333] font-black text-xs">vs</div>
+                            <div className="text-center">
+                              {lg.home.logo && <img src={lg.home.logo} className="w-5 h-5 object-contain mx-auto mb-0.5" alt="" />}
+                              <div className="text-[#888] text-[9px] font-black uppercase">{lg.home.abbr || lg.home.name?.split(' ').pop()}</div>
+                              <div className="text-[#f0ebe0] font-black text-lg leading-none">{lg.home.score || '0'}</div>
+                            </div>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="h-1.5 bg-[#252525] rounded-full overflow-hidden mb-1.5">
+                            <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${barPct}%` }} />
+                          </div>
+                          <div className={`text-[9px] font-black uppercase tracking-widest text-center ${barColor === 'bg-green-400' ? 'text-green-400' : barColor === 'bg-[#E21111]' ? 'text-[#E21111]' : 'text-yellow-400'}`}>
+                            {statusText}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div>
-                    <div className="space-y-1 mb-2">
-                      {bet.legs?.map((leg, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs">
-                          <span className="text-[#444] w-4 shrink-0">#{i+1}</span>
-                          <span className="text-[#f0ebe0] font-bold">{leg.pick}</span>
-                          {leg.game && <span className="text-[#555]">· {leg.game}</span>}
-                          {leg.odds && <span className="text-[#888] ml-auto shrink-0">{leg.odds}</span>}
-                        </div>
-                      ))}
+                    <div className="space-y-2 mb-2">
+                      {bet.legs?.map((leg, i) => {
+                        const pick = leg.pick?.toLowerCase() || '';
+                        const lg = liveGames.find(g =>
+                          g.away.name?.toLowerCase().includes(pick.split(' ').pop()) ||
+                          g.home.name?.toLowerCase().includes(pick.split(' ').pop())
+                        );
+                        const isPickHome = lg ? lg.home.name?.toLowerCase().includes(pick.split(' ').pop()) : false;
+                        const pickScore = lg ? (parseInt(isPickHome ? lg.home.score : lg.away.score) || 0) : null;
+                        const oppScore  = lg ? (parseInt(isPickHome ? lg.away.score : lg.home.score) || 0) : null;
+                        const margin = pickScore !== null ? pickScore - oppScore : null;
+                        const lineVal = parseFloat(leg.line);
+                        const isMl = !leg.line || leg.line?.toUpperCase() === 'ML' || isNaN(lineVal);
+                        const gameActive = lg && (lg.isLive || lg.isFinal);
+                        let legStatus = null;
+                        if (gameActive && margin !== null) {
+                          if (isMl) {
+                            legStatus = margin > 0 ? { label: `+${margin}`, color: 'text-green-400' }
+                              : margin === 0 ? { label: 'TIE', color: 'text-yellow-400' }
+                              : { label: `${margin}`, color: 'text-[#E21111]' };
+                          } else {
+                            const needed = -lineVal;
+                            legStatus = margin >= needed
+                              ? { label: `CVR +${(margin - needed).toFixed(1)}`, color: 'text-green-400' }
+                              : { label: `NED ${Math.abs(margin - needed).toFixed(1)}`, color: 'text-yellow-400' };
+                          }
+                        }
+                        return (
+                          <div key={i} className="flex items-center gap-2 text-xs bg-[#141414] rounded-lg px-2.5 py-2">
+                            <span className="text-[#444] w-4 shrink-0 font-black">#{i+1}</span>
+                            <span className="text-[#f0ebe0] font-bold flex-1">{leg.pick}</span>
+                            {leg.line && <span className="text-[#E21111] text-[9px] font-black bg-[#E21111]/10 px-1.5 py-0.5 rounded">{leg.line}</span>}
+                            {legStatus && (
+                              <span className={`text-[9px] font-black ${legStatus.color}`}>
+                                {lg.isLive && <span className="inline-block w-1 h-1 rounded-full bg-current mr-1 animate-pulse" />}
+                                {legStatus.label}
+                              </span>
+                            )}
+                            {leg.odds && <span className="text-[#555] ml-1 shrink-0">{leg.odds}</span>}
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="flex items-center gap-4 text-xs mt-2 pt-2 border-t border-[#252525]">
                       <span className="text-[#555]">Odds <span className="text-[#888] font-bold">{bet.odds}</span></span>
