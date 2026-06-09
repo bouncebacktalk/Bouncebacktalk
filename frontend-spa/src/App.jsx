@@ -1422,6 +1422,7 @@ const ScoresPage = () => {
 
 // ─── BEST BETS PAGE ───────────────────────────────────────────────────────────
 const BestBetsPage = () => {
+  const [pageTab, setPageTab] = useState('picks'); // 'picks' | 'tracker'
   const [activeLeague, setActiveLeague] = useState('all');
   const [sortBy, setSortBy] = useState('confidence');
   const [expandedId, setExpandedId] = useState(null);
@@ -1431,6 +1432,8 @@ const BestBetsPage = () => {
   useEffect(() => {
     fetchBestBets().then(setAllBets).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  const myBetCount = getStoredBets().length;
 
   const tabs = [{ key: 'all', label: 'All' }, ...LEAGUES.map(l => ({ key: l.key, label: l.label }))];
   const filtered = (activeLeague === 'all' ? allBets : allBets.filter(b => b.league.toLowerCase() === activeLeague))
@@ -1449,13 +1452,19 @@ const BestBetsPage = () => {
     <div className="max-w-7xl mx-auto px-4 py-8">
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <div className="w-1 h-8 bg-[#E21111] rounded-full" />
-            <h1 className="text-3xl font-black uppercase tracking-tight text-[#f0ebe0]">Today's Best Bets</h1>
+            <h1 className="text-3xl font-black uppercase tracking-tight text-[#f0ebe0]">
+              {pageTab === 'picks' ? "Today's Best Bets" : "My Bet Tracker"}
+            </h1>
           </div>
-          <p className="text-[#555] text-sm pl-4">AI-powered picks · Updated {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <p className="text-[#555] text-sm pl-4">
+            {pageTab === 'picks'
+              ? `AI-powered picks · Updated ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`
+              : 'Track your straight bets and parlays · See your P&L'}
+          </p>
         </div>
         {/* Summary stats */}
         <div className="flex items-center gap-3">
@@ -1473,6 +1482,27 @@ const BestBetsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Page tabs */}
+      <div className="flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-1 mb-6 w-fit">
+        {[
+          { key: 'picks', label: "Today's Picks" },
+          { key: 'tracker', label: `My Bets${myBetCount > 0 ? ` (${myBetCount})` : ''}` },
+        ].map(t => (
+          <button key={t.key} onClick={() => setPageTab(t.key)}
+            className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${
+              pageTab === t.key ? 'bg-[#E21111] text-white' : 'text-[#888] hover:text-[#f0ebe0]'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tracker tab */}
+      {pageTab === 'tracker' && <BetTracker />}
+
+      {/* Picks tab */}
+      {pageTab === 'picks' && <>
 
       {/* Disclaimer */}
       <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
@@ -1594,6 +1624,326 @@ const BestBetsPage = () => {
           Subscribe Free →
         </Link>
       </div>
+
+      </>}
+    </div>
+  );
+};
+
+// ─── BET TRACKER ─────────────────────────────────────────────────────────────
+const BBT_BETS_KEY = 'bbt_my_bets';
+const getStoredBets = () => { try { return JSON.parse(localStorage.getItem(BBT_BETS_KEY)) || []; } catch { return []; } };
+const saveStoredBets = (bets) => localStorage.setItem(BBT_BETS_KEY, JSON.stringify(bets));
+
+const calcPayout = (wager, odds) => {
+  const o = parseFloat(odds);
+  if (isNaN(o) || !wager) return 0;
+  return o > 0 ? wager * (o / 100) : wager * (100 / Math.abs(o));
+};
+
+const BetTracker = () => {
+  const [myBets, setMyBets] = useState(getStoredBets);
+  const [mode, setMode] = useState(null); // null | 'straight' | 'parlay'
+  const [games, setGames] = useState([]);
+  const [loadingGames, setLoadingGames] = useState(false);
+
+  // Straight bet form
+  const [sbGame, setSbGame] = useState('');
+  const [sbPick, setSbPick] = useState('');
+  const [sbOdds, setSbOdds] = useState('');
+  const [sbWager, setSbWager] = useState('');
+  const [sbNote, setSbNote] = useState('');
+
+  // Parlay form
+  const [plLegs, setPlLegs] = useState([{ game: '', pick: '', odds: '' }]);
+  const [plOdds, setPlOdds] = useState('');
+  const [plWager, setPlWager] = useState('');
+
+  useEffect(() => {
+    if (mode && games.length === 0) {
+      setLoadingGames(true);
+      fetchScores().then(g => { setGames(g); setLoadingGames(false); });
+    }
+  }, [mode]);
+
+  const persist = (updated) => { saveStoredBets(updated); setMyBets(updated); };
+
+  const addStraight = () => {
+    if (!sbPick || !sbOdds || !sbWager) return;
+    const game = games.find(g => g.id === sbGame);
+    const payout = calcPayout(parseFloat(sbWager), sbOdds);
+    persist([...myBets, {
+      id: Date.now(), type: 'straight', createdAt: new Date().toISOString(),
+      game: game ? `${game.away.name} @ ${game.home.name}` : sbGame,
+      gameId: sbGame, pick: sbPick, odds: sbOdds,
+      wager: parseFloat(sbWager), payout: +payout.toFixed(2),
+      note: sbNote, result: 'pending'
+    }]);
+    setSbGame(''); setSbPick(''); setSbOdds(''); setSbWager(''); setSbNote('');
+    setMode(null);
+  };
+
+  const addParlay = () => {
+    if (plLegs.some(l => !l.pick) || !plOdds || !plWager) return;
+    const payout = calcPayout(parseFloat(plWager), plOdds);
+    persist([...myBets, {
+      id: Date.now(), type: 'parlay', createdAt: new Date().toISOString(),
+      legs: plLegs.map(l => {
+        const g = games.find(gm => gm.id === l.game);
+        return { game: g ? `${g.away.name} @ ${g.home.name}` : l.game, pick: l.pick, odds: l.odds };
+      }),
+      odds: plOdds, wager: parseFloat(plWager), payout: +payout.toFixed(2), result: 'pending'
+    }]);
+    setPlLegs([{ game: '', pick: '', odds: '' }]); setPlOdds(''); setPlWager('');
+    setMode(null);
+  };
+
+  const setResult = (id, result) => persist(myBets.map(b => b.id === id ? { ...b, result } : b));
+  const deleteBet = (id) => persist(myBets.filter(b => b.id !== id));
+
+  // P&L summary
+  const settled = myBets.filter(b => b.result !== 'pending');
+  const won = myBets.filter(b => b.result === 'win');
+  const lost = myBets.filter(b => b.result === 'loss');
+  const totalWagered = myBets.reduce((s, b) => s + (b.wager || 0), 0);
+  const totalProfit = won.reduce((s, b) => s + (b.payout || 0), 0) - lost.reduce((s, b) => s + (b.wager || 0), 0);
+  const winRate = settled.length ? Math.round((won.length / settled.length) * 100) : null;
+
+  const resultStyle = r => r === 'win' ? 'text-green-400 bg-green-400/10 border-green-400/20'
+    : r === 'loss' ? 'text-[#E21111] bg-[#E21111]/10 border-[#E21111]/20'
+    : 'text-[#888] bg-[#2a2a2a] border-[#2a2a2a]';
+
+  const inputCls = "w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#E21111] rounded-xl px-3 py-2.5 text-[#f0ebe0] text-sm placeholder-[#444] outline-none transition-colors";
+  const labelCls = "text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1";
+
+  return (
+    <div>
+      {/* P&L Banner */}
+      {myBets.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: 'Total Bets', value: myBets.length, color: 'text-[#f0ebe0]' },
+            { label: 'Win Rate', value: winRate !== null ? `${winRate}%` : '—', color: winRate >= 55 ? 'text-green-400' : winRate < 45 ? 'text-[#E21111]' : 'text-yellow-400' },
+            { label: 'Total Wagered', value: `$${totalWagered.toFixed(2)}`, color: 'text-[#f0ebe0]' },
+            { label: 'Profit / Loss', value: `${totalProfit >= 0 ? '+' : ''}$${totalProfit.toFixed(2)}`, color: totalProfit >= 0 ? 'text-green-400' : 'text-[#E21111]' },
+          ].map(s => (
+            <div key={s.label} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 text-center">
+              <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
+              <div className="text-[#555] text-[9px] font-black uppercase tracking-widest mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add bet buttons */}
+      {mode === null && (
+        <div className="flex gap-3 mb-6">
+          <button onClick={() => setMode('straight')}
+            className="flex-1 py-3 bg-[#E21111] hover:bg-red-700 rounded-xl text-white text-[11px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2">
+            + Straight Bet
+          </button>
+          <button onClick={() => setMode('parlay')}
+            className="flex-1 py-3 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-[#E21111]/40 rounded-xl text-[#f0ebe0] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+            + Parlay
+          </button>
+        </div>
+      )}
+
+      {/* Straight Bet Form */}
+      {mode === 'straight' && (
+        <div className="bg-[#1a1a1a] border border-[#E21111]/30 rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[#f0ebe0] font-black text-sm uppercase tracking-tight">New Straight Bet</h3>
+            <button onClick={() => setMode(null)} className="text-[#555] hover:text-[#f0ebe0]"><XIcon size={16} /></button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className={labelCls}>Game</label>
+              {loadingGames ? <div className="h-10 bg-[#141414] border border-[#2a2a2a] rounded-xl animate-pulse" /> : (
+                <select value={sbGame} onChange={e => setSbGame(e.target.value)} className={inputCls}>
+                  <option value="">Select game (optional)</option>
+                  {games.map(g => <option key={g.id} value={g.id}>{g.away.name} @ {g.home.name} · {g.leagueLabel}</option>)}
+                </select>
+              )}
+            </div>
+            <div>
+              <label className={labelCls}>Your Pick</label>
+              <input value={sbPick} onChange={e => setSbPick(e.target.value)} placeholder="e.g. Knicks -4.5" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Odds (American)</label>
+              <input value={sbOdds} onChange={e => setSbOdds(e.target.value)} placeholder="-110" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Wager ($)</label>
+              <input value={sbWager} onChange={e => setSbWager(e.target.value)} type="number" min="0" placeholder="50" className={inputCls} />
+            </div>
+          </div>
+          <div className="mb-4">
+            <label className={labelCls}>Note (optional)</label>
+            <input value={sbNote} onChange={e => setSbNote(e.target.value)} placeholder="Why you like this bet..." className={inputCls} />
+          </div>
+          {sbWager && sbOdds && (
+            <div className="bg-[#141414] border border-[#2a2a2a] rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between">
+              <span className="text-[#555] text-xs font-bold uppercase tracking-wider">To Win</span>
+              <span className="text-green-400 font-black text-sm">${calcPayout(parseFloat(sbWager), sbOdds).toFixed(2)}</span>
+            </div>
+          )}
+          <button onClick={addStraight} disabled={!sbPick || !sbOdds || !sbWager}
+            className="w-full py-3 bg-[#E21111] hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white text-[11px] font-black uppercase tracking-widest transition-colors">
+            Add Bet
+          </button>
+        </div>
+      )}
+
+      {/* Parlay Form */}
+      {mode === 'parlay' && (
+        <div className="bg-[#1a1a1a] border border-[#E21111]/30 rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[#f0ebe0] font-black text-sm uppercase tracking-tight">New Parlay</h3>
+            <button onClick={() => setMode(null)} className="text-[#555] hover:text-[#f0ebe0]"><XIcon size={16} /></button>
+          </div>
+          {plLegs.map((leg, i) => (
+            <div key={i} className="bg-[#141414] border border-[#2a2a2a] rounded-xl p-3 mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[#555] text-[10px] font-black uppercase tracking-widest">Leg {i + 1}</span>
+                {plLegs.length > 1 && (
+                  <button onClick={() => setPlLegs(plLegs.filter((_, j) => j !== i))} className="text-[#555] hover:text-[#E21111]"><XIcon size={12} /></button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="sm:col-span-1">
+                  {loadingGames ? <div className="h-9 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg animate-pulse" /> : (
+                    <select value={leg.game} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, game: e.target.value } : l))} className={inputCls + ' text-xs'}>
+                      <option value="">Game (opt)</option>
+                      {games.map(g => <option key={g.id} value={g.id}>{g.away.name} @ {g.home.name}</option>)}
+                    </select>
+                  )}
+                </div>
+                <input value={leg.pick} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, pick: e.target.value } : l))}
+                  placeholder="Pick" className={inputCls + ' text-xs'} />
+                <input value={leg.odds} onChange={e => setPlLegs(plLegs.map((l, j) => j === i ? { ...l, odds: e.target.value } : l))}
+                  placeholder="Odds (-110)" className={inputCls + ' text-xs'} />
+              </div>
+            </div>
+          ))}
+          <button onClick={() => setPlLegs([...plLegs, { game: '', pick: '', odds: '' }])}
+            className="w-full py-2 mb-4 border border-dashed border-[#3a3a3a] hover:border-[#E21111]/40 rounded-xl text-[#555] hover:text-[#f0ebe0] text-[10px] font-black uppercase tracking-widest transition-all">
+            + Add Leg
+          </button>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className={labelCls}>Combined Odds</label>
+              <input value={plOdds} onChange={e => setPlOdds(e.target.value)} placeholder="+600" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Wager ($)</label>
+              <input value={plWager} onChange={e => setPlWager(e.target.value)} type="number" placeholder="20" className={inputCls} />
+            </div>
+          </div>
+          {plWager && plOdds && (
+            <div className="bg-[#141414] border border-[#2a2a2a] rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between">
+              <span className="text-[#555] text-xs font-bold uppercase tracking-wider">To Win</span>
+              <span className="text-green-400 font-black text-sm">${calcPayout(parseFloat(plWager), plOdds).toFixed(2)}</span>
+            </div>
+          )}
+          <button onClick={addParlay} disabled={plLegs.some(l => !l.pick) || !plOdds || !plWager}
+            className="w-full py-3 bg-[#E21111] hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white text-[11px] font-black uppercase tracking-widest transition-colors">
+            Add Parlay
+          </button>
+        </div>
+      )}
+
+      {/* Bet list */}
+      {myBets.length === 0 ? (
+        <div className="text-center py-16 border border-dashed border-[#2a2a2a] rounded-2xl">
+          <div className="text-5xl mb-4">🎯</div>
+          <h3 className="text-[#f0ebe0] font-black text-base uppercase tracking-tight mb-1">No Bets Yet</h3>
+          <p className="text-[#555] text-sm">Add a straight bet or parlay to start tracking your record.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {[...myBets].reverse().map(bet => (
+            <div key={bet.id} className={`bg-[#1a1a1a] border rounded-2xl overflow-hidden ${
+              bet.result === 'win' ? 'border-green-400/20' : bet.result === 'loss' ? 'border-[#E21111]/20' : 'border-[#2a2a2a]'
+            }`}>
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-2 py-0.5 rounded-full">
+                      {bet.type === 'parlay' ? `${bet.legs?.length}-Leg Parlay` : 'Straight'}
+                    </span>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${resultStyle(bet.result)}`}>
+                      {bet.result === 'win' ? '✓ Win' : bet.result === 'loss' ? '✗ Loss' : '⏳ Pending'}
+                    </span>
+                  </div>
+                  <span className="text-[#444] text-[10px] shrink-0">{new Date(bet.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                </div>
+
+                {bet.type === 'straight' ? (
+                  <div>
+                    <div className="text-[#f0ebe0] font-black text-base mb-0.5">{bet.pick}</div>
+                    {bet.game && <div className="text-[#555] text-xs mb-1">{bet.game}</div>}
+                    {bet.note && <div className="text-[#888] text-xs italic mb-1">"{bet.note}"</div>}
+                    <div className="flex items-center gap-4 text-xs mt-2">
+                      <span className="text-[#555]">Odds <span className="text-[#888] font-bold">{bet.odds}</span></span>
+                      <span className="text-[#555]">Wagered <span className="text-[#888] font-bold">${bet.wager}</span></span>
+                      <span className="text-[#555]">To Win <span className="text-green-400 font-bold">${bet.payout}</span></span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="space-y-1 mb-2">
+                      {bet.legs?.map((leg, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className="text-[#444] w-4 shrink-0">#{i+1}</span>
+                          <span className="text-[#f0ebe0] font-bold">{leg.pick}</span>
+                          {leg.game && <span className="text-[#555]">· {leg.game}</span>}
+                          {leg.odds && <span className="text-[#888] ml-auto shrink-0">{leg.odds}</span>}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-4 text-xs mt-2 pt-2 border-t border-[#252525]">
+                      <span className="text-[#555]">Odds <span className="text-[#888] font-bold">{bet.odds}</span></span>
+                      <span className="text-[#555]">Wagered <span className="text-[#888] font-bold">${bet.wager}</span></span>
+                      <span className="text-[#555]">To Win <span className="text-green-400 font-bold">${bet.payout}</span></span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Result buttons */}
+                {bet.result === 'pending' && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-[#252525]">
+                    <button onClick={() => setResult(bet.id, 'win')}
+                      className="flex-1 py-2 bg-green-400/10 hover:bg-green-400/20 border border-green-400/20 rounded-lg text-green-400 text-[10px] font-black uppercase tracking-wider transition-all">
+                      ✓ Mark Win
+                    </button>
+                    <button onClick={() => setResult(bet.id, 'loss')}
+                      className="flex-1 py-2 bg-[#E21111]/10 hover:bg-[#E21111]/20 border border-[#E21111]/20 rounded-lg text-[#E21111] text-[10px] font-black uppercase tracking-wider transition-all">
+                      ✗ Mark Loss
+                    </button>
+                    <button onClick={() => deleteBet(bet.id)}
+                      className="px-3 py-2 bg-[#141414] hover:bg-[#252525] border border-[#2a2a2a] rounded-lg text-[#555] hover:text-[#E21111] text-[10px] transition-all">
+                      🗑
+                    </button>
+                  </div>
+                )}
+                {bet.result !== 'pending' && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-[#252525]">
+                    <button onClick={() => setResult(bet.id, 'pending')}
+                      className="text-[#444] hover:text-[#888] text-[10px] font-black uppercase tracking-wider transition-colors">
+                      Undo result
+                    </button>
+                    <button onClick={() => deleteBet(bet.id)} className="ml-auto text-[#333] hover:text-[#E21111] text-[10px] transition-colors">🗑</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-center text-[#333] text-[10px] mt-8">For entertainment purposes only. Please gamble responsibly. 21+</p>
     </div>
   );
 };
