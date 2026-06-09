@@ -468,13 +468,15 @@ const Hero = ({ games }) => {
           {/* Right sidebar — live scores */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-[11px] font-black uppercase tracking-widest text-[#888]">Live & Recent</h2>
+              <h2 className="text-[11px] font-black uppercase tracking-widest text-[#888] flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E21111] animate-pulse" /> Live Now
+              </h2>
               <Link to="/scores" className="text-[10px] font-black uppercase tracking-widest text-[#E21111] hover:text-red-400">All Scores →</Link>
             </div>
-            {games.length === 0 ? (
-              <div className="bg-[#1a1a1a] rounded-xl p-6 text-center text-[#555] text-sm">No games today</div>
+            {games.filter(g => g.isLive).length === 0 ? (
+              <div className="bg-[#1a1a1a] rounded-xl p-6 text-center text-[#555] text-sm">No live games right now</div>
             ) : (
-              games.slice(0, 6).map(g => (
+              games.filter(g => g.isLive).slice(0, 6).map(g => (
                 <Link key={g.id} to={`/game/${g.league}/${g.id}`}
                   className="bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-xl p-3.5 transition-all group">
                   <div className="flex items-center justify-between mb-2">
