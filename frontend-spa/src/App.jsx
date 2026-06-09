@@ -1929,6 +1929,68 @@ const BetTracker = () => {
   const setResult = (id, result) => persist(myBets.map(b => b.id === id ? { ...b, result } : b));
   const deleteBet = (id) => persist(myBets.filter(b => b.id !== id));
 
+  // ── Auto-resolve pending bets when a game goes FINAL ────────────────────
+  useEffect(() => {
+    if (!liveGames.length) return;
+    const finalGames = liveGames.filter(g => g.isFinal);
+    if (!finalGames.length) return;
+
+    const resolvePick = (pick, line, finalGame) => {
+      const pickLower = (pick || '').toLowerCase();
+      const lastWord  = pickLower.split(' ').pop();
+      const isHome = finalGame.home.name?.toLowerCase().includes(lastWord);
+      const isAway = finalGame.away.name?.toLowerCase().includes(lastWord);
+      if (!isHome && !isAway) return null;
+      const pickScore = parseInt(isHome ? finalGame.home.score : finalGame.away.score) || 0;
+      const oppScore  = parseInt(isHome ? finalGame.away.score : finalGame.home.score) || 0;
+      const margin = pickScore - oppScore;
+      const lineVal = parseFloat(line);
+      const isOU = line && /^[ou]/i.test(line.trim());
+      const isMl = !line || line.toUpperCase() === 'ML' || isNaN(lineVal);
+      if (isOU) {
+        const target = parseFloat(line.replace(/[OU]/i, '')) || 0;
+        const isOver = /^o/i.test(line.trim());
+        const total  = pickScore + oppScore;
+        return (isOver ? total > target : total < target) ? 'win' : 'loss';
+      }
+      if (isMl) return margin > 0 ? 'win' : margin < 0 ? 'loss' : null; // push = no change
+      // Spread: pick needs to win by more than |lineVal| if fav (-), or just not lose by more if dog (+)
+      return (margin + lineVal) > 0 ? 'win' : 'loss';
+    };
+
+    let changed = false;
+    const updated = myBets.map(bet => {
+      if (bet.result !== 'pending') return bet;
+      if (bet.type === 'straight') {
+        const fg = finalGames.find(g => {
+          const lw = (bet.pick || '').toLowerCase().split(' ').pop();
+          return g.home.name?.toLowerCase().includes(lw) || g.away.name?.toLowerCase().includes(lw);
+        });
+        if (!fg) return bet;
+        const r = resolvePick(bet.pick, bet.line, fg);
+        if (!r) return bet;
+        changed = true;
+        return { ...bet, result: r };
+      }
+      if (bet.type === 'parlay') {
+        const legResults = bet.legs.map(leg => {
+          const fg = finalGames.find(g => {
+            const lw = (leg.pick || '').toLowerCase().split(' ').pop();
+            return g.home.name?.toLowerCase().includes(lw) || g.away.name?.toLowerCase().includes(lw);
+          });
+          return fg ? resolvePick(leg.pick, leg.line, fg) : null;
+        });
+        // Only resolve if ALL legs have a final game result
+        if (legResults.some(r => r === null)) return bet;
+        const r = legResults.every(r => r === 'win') ? 'win' : 'loss';
+        changed = true;
+        return { ...bet, result: r };
+      }
+      return bet;
+    });
+    if (changed) persist(updated);
+  }, [liveGames]);
+
   // P&L summary
   const settled = myBets.filter(b => b.result !== 'pending');
   const won = myBets.filter(b => b.result === 'win');
@@ -2266,32 +2328,18 @@ const BetTracker = () => {
                   </div>
                 )}
 
-                {/* Result buttons */}
-                {bet.result === 'pending' && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-[#252525]">
-                    <button onClick={() => setResult(bet.id, 'win')}
-                      className="flex-1 py-2 bg-green-400/10 hover:bg-green-400/20 border border-green-400/20 rounded-lg text-green-400 text-[10px] font-black uppercase tracking-wider transition-all">
-                      ✓ Mark Win
-                    </button>
-                    <button onClick={() => setResult(bet.id, 'loss')}
-                      className="flex-1 py-2 bg-[#E21111]/10 hover:bg-[#E21111]/20 border border-[#E21111]/20 rounded-lg text-[#E21111] text-[10px] font-black uppercase tracking-wider transition-all">
-                      ✗ Mark Loss
-                    </button>
-                    <button onClick={() => deleteBet(bet.id)}
-                      className="px-3 py-2 bg-[#141414] hover:bg-[#252525] border border-[#2a2a2a] rounded-lg text-[#555] hover:text-[#E21111] text-[10px] transition-all">
-                      🗑
-                    </button>
-                  </div>
-                )}
-                {bet.result !== 'pending' && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-[#252525]">
+                {/* Actions — auto-resolved, no manual buttons */}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#252525]">
+                  {bet.result !== 'pending' ? (
                     <button onClick={() => setResult(bet.id, 'pending')}
                       className="text-[#444] hover:text-[#888] text-[10px] font-black uppercase tracking-wider transition-colors">
                       Undo result
                     </button>
-                    <button onClick={() => deleteBet(bet.id)} className="ml-auto text-[#333] hover:text-[#E21111] text-[10px] transition-colors">🗑</button>
-                  </div>
-                )}
+                  ) : (
+                    <span className="text-[#444] text-[10px] font-black uppercase tracking-widest">Auto-resolves at final</span>
+                  )}
+                  <button onClick={() => deleteBet(bet.id)} className="text-[#333] hover:text-[#E21111] text-[10px] transition-colors">🗑</button>
+                </div>
               </div>
             </div>
           ))}
