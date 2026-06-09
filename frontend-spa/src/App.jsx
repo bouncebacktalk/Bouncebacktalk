@@ -121,12 +121,22 @@ const LEAGUES = [
   { key: 'mlb', label: 'MLB', sport: 'baseball',   color: '#002D72' },
   { key: 'nhl', label: 'NHL', sport: 'hockey',     color: '#000000' },
 ];
-const espnUrl = (sport, league) =>
-  `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard`;
+// Always use the user's LOCAL date so UTC midnight doesn't flip to "tomorrow"
+const localDateStr = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+};
+
+const espnUrl = (sport, league, date) =>
+  `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard?dates=${date || localDateStr()}`;
 
 const fetchScores = async () => {
+  const today = localDateStr();
   const results = await Promise.allSettled(
-    LEAGUES.map(l => fetch(espnUrl(l.sport, l.key)).then(r => r.json()))
+    LEAGUES.map(l => fetch(espnUrl(l.sport, l.key, today)).then(r => r.json()))
   );
   return LEAGUES.flatMap((league, i) => {
     if (results[i].status !== 'fulfilled') return [];
