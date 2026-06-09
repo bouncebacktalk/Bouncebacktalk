@@ -449,15 +449,15 @@ const Hero = ({ games }) => {
                 <span className="bg-[#E21111] text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full tracking-widest flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live Analysis
                 </span>
-                <span className="text-white/50 text-[10px] font-bold uppercase tracking-widest">NBA Finals · Knicks Lead 2-1</span>
+                <span className="text-white/50 text-[10px] font-bold uppercase tracking-widest">NBA Finals · Knicks Lead 2-0</span>
               </div>
               <h1 className="text-3xl md:text-5xl font-black uppercase italic leading-[0.9] text-white mb-3 tracking-tight">
-                Spurs Survive Wemby<br />
-                <span className="text-[#E21111]">Injury Scare</span><br />
-                Rally Past Knicks 134-132
+                Brunson Clutch<br />
+                <span className="text-[#E21111]">Free Throw Seals</span><br />
+                Game 2, Knicks Up 2-0
               </h1>
               <p className="text-white/60 text-sm max-w-lg line-clamp-2 leading-relaxed">
-                Victor Wembanyama shook off an injury scare and San Antonio staged a furious fourth-quarter comeback to steal Game 3 — cutting New York's series lead to 2-1.
+                Jalen Brunson hit the go-ahead free throw with 9.5 seconds left as New York edged San Antonio 105-104 — the Knicks are one win away from the NBA Finals with Game 3 tonight in San Antonio.
               </p>
               <div className="mt-4 flex items-center gap-2 text-[#E21111] text-[11px] font-black uppercase tracking-widest">
                 Read Full Analysis <ChevronRight size={14} />
