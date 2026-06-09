@@ -559,6 +559,96 @@ const genAnalysis = (league, fav, dog, spread, total, isTotal) => {
   }[league]?.[(Math.abs(fav.charCodeAt(0)) % 3)] || `${fav} are the stronger team here and this line reflects real market confidence.`;
 };
 
+// ─── MLB PROBABLES + LINEUPS ──────────────────────────────────────────────────
+const fetchMLBProbables = async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const sched = await fetch(
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=probablePitcher,lineups`
+    ).then(r => r.json());
+
+    const games = sched.dates?.[0]?.games || [];
+
+    // Collect all unique pitcher IDs
+    const pitcherIds = new Set();
+    games.forEach(g => {
+      if (g.teams.away.probablePitcher?.id) pitcherIds.add(g.teams.away.probablePitcher.id);
+      if (g.teams.home.probablePitcher?.id) pitcherIds.add(g.teams.home.probablePitcher.id);
+    });
+
+    // Batch-fetch season stats for all pitchers in parallel
+    const statsMap = {};
+    await Promise.allSettled(
+      [...pitcherIds].map(id =>
+        fetch(`https://statsapi.mlb.com/api/v1/people/${id}/stats?stats=season&season=2026&sportId=1`)
+          .then(r => r.json())
+          .then(d => {
+            const s = d.stats?.[0]?.splits?.[0]?.stat;
+            if (s) statsMap[id] = { era: s.era, wins: s.wins, losses: s.losses, so: s.strikeOuts, ip: s.inningsPitched, whip: s.whip };
+          })
+      )
+    );
+
+    // Build lookup keyed by "AWAY@HOME" abbreviation
+    const lookup = {};
+    games.forEach(g => {
+      const awayAbbr = g.teams.away.team.abbreviation;
+      const homeAbbr = g.teams.home.team.abbreviation;
+      const key = `${awayAbbr}@${homeAbbr}`;
+
+      const ap = g.teams.away.probablePitcher;
+      const hp = g.teams.home.probablePitcher;
+
+      // Lineups (posted ~1hr before game)
+      const awayLineup = (g.lineups?.awayPlayers || []).map(p => ({
+        name: p.fullName, pos: p.primaryPosition?.abbreviation || ''
+      }));
+      const homeLineup = (g.lineups?.homePlayers || []).map(p => ({
+        name: p.fullName, pos: p.primaryPosition?.abbreviation || ''
+      }));
+
+      lookup[key] = {
+        awayPitcher: ap ? { name: ap.fullName, ...(statsMap[ap.id] || {}) } : null,
+        homePitcher: hp ? { name: hp.fullName, ...(statsMap[hp.id] || {}) } : null,
+        awayLineup,
+        homeLineup,
+      };
+    });
+
+    return lookup;
+  } catch { return {}; }
+};
+
+const PitcherLine = ({ pitcher, side }) => {
+  if (!pitcher) return (
+    <div className="text-[#555] text-[10px] italic">TBD</div>
+  );
+  const record = (pitcher.wins != null && pitcher.losses != null) ? `${pitcher.wins}-${pitcher.losses}` : '';
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[#f0ebe0] text-xs font-bold truncate">{pitcher.name}</span>
+      <div className="flex items-center gap-2 shrink-0">
+        {record && <span className="text-[#888] text-[10px] font-bold">{record}</span>}
+        {pitcher.era && <span className="text-[#aaa] text-[10px]">ERA {pitcher.era}</span>}
+        {pitcher.so  && <span className="text-[#aaa] text-[10px]">{pitcher.so}K</span>}
+      </div>
+    </div>
+  );
+};
+
+const LineupList = ({ players }) => {
+  if (!players?.length) return (
+    <p className="text-[#555] text-[10px] italic col-span-2">Lineup not posted yet</p>
+  );
+  return players.slice(0, 9).map((p, i) => (
+    <div key={i} className="flex items-center gap-1.5">
+      <span className="text-[#555] text-[9px] w-3 shrink-0">{i + 1}.</span>
+      <span className="text-[#aaa] text-[9px] w-5 shrink-0 font-bold">{p.pos}</span>
+      <span className="text-[#f0ebe0] text-[10px] truncate">{p.name}</span>
+    </div>
+  ));
+};
+
 const fetchBestBets = async () => {
   // Use today's date explicitly so bets are always current
   const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -679,8 +769,10 @@ const ConfidenceBar = ({ pct }) => (
 const BestBets = () => {
   const [bets, setBets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [mlbProbables, setMlbProbables] = useState({});
   useEffect(() => {
     fetchBestBets().then(d => setBets(d.slice(0, 3))).catch(() => {}).finally(() => setLoading(false));
+    fetchMLBProbables().then(setMlbProbables);
   }, []);
 
   return (
@@ -710,37 +802,57 @@ const BestBets = () => {
         </div>
       ) : (
         <div className="grid md:grid-cols-3 gap-4">
-          {bets.map(bet => (
-            <Link key={bet.id} to={`/game/${bet.leagueKey}/${bet.gameId}`}
-              className="bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#E21111]/40 rounded-2xl p-5 transition-all hover:-translate-y-0.5 group block">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-2 py-0.5 rounded-full">{bet.league}</span>
-                <span className="text-[#888] text-xs font-bold">{bet.game}</span>
-              </div>
-              <div className="mb-3">
-                <div className="flex items-baseline justify-between mb-1">
-                  <span className="text-[#f0ebe0] font-black text-lg">{bet.pick}</span>
-                  <span className="text-[#888] text-sm font-bold">{bet.odds}</span>
+          {bets.map(bet => {
+            const probKey = `${bet.awayTeam?.name}@${bet.homeTeam?.name}`;
+            const prob = bet.league === 'MLB' ? (mlbProbables[probKey] || null) : null;
+            return (
+              <Link key={bet.id} to={`/game/${bet.leagueKey}/${bet.gameId}`}
+                className="bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#E21111]/40 rounded-2xl overflow-hidden transition-all hover:-translate-y-0.5 group block">
+                <div className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-2 py-0.5 rounded-full">{bet.league}</span>
+                    <span className="text-[#888] text-xs font-bold">{bet.game}</span>
+                  </div>
+                  <div className="mb-3">
+                    <div className="flex items-baseline justify-between mb-1">
+                      <span className="text-[#f0ebe0] font-black text-lg">{bet.pick}</span>
+                      <span className="text-[#888] text-sm font-bold">{bet.odds}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <ConfidenceBar pct={bet.confidence} />
+                      <span className={`text-[10px] font-black shrink-0 ${bet.confidence >= 80 ? 'text-green-400' : bet.confidence >= 65 ? 'text-yellow-400' : 'text-[#E21111]'}`}>
+                        {bet.confidence}%
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-green-400 text-[10px] font-bold">
+                      <TrendingIcon size={11} /> {bet.trend}
+                    </div>
+                  </div>
+                  <p className="text-[#888] text-xs leading-relaxed line-clamp-2 mb-3">{bet.analysis}</p>
+                  <div className="border-t border-[#2a2a2a] pt-3">
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="text-[#555] uppercase font-bold tracking-wider">Game:</span>
+                      <span className="text-[#888]">{bet.time}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <ConfidenceBar pct={bet.confidence} />
-                  <span className={`text-[10px] font-black shrink-0 ${bet.confidence >= 80 ? 'text-green-400' : bet.confidence >= 65 ? 'text-yellow-400' : 'text-[#E21111]'}`}>
-                    {bet.confidence}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-green-400 text-[10px] font-bold">
-                  <TrendingIcon size={11} /> {bet.trend} this week
-                </div>
-              </div>
-              <p className="text-[#888] text-xs leading-relaxed line-clamp-2 mb-3">{bet.analysis}</p>
-              <div className="border-t border-[#2a2a2a] pt-3">
-                <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-[#555] uppercase font-bold tracking-wider">Game:</span>
-                  <span className="text-[#888]">{bet.time}</span>
-                </div>
-              </div>
-            </Link>
-          ))}
+                {/* MLB probable pitchers strip */}
+                {prob && (
+                  <div className="bg-[#141414] border-t border-[#2a2a2a] px-5 py-3 space-y-1.5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-[#555] mb-2">Probable Pitchers</p>
+                    <div className="flex items-center gap-2">
+                      {bet.awayTeam?.logo && <img src={bet.awayTeam.logo} className="w-3.5 h-3.5 object-contain opacity-60" alt="" />}
+                      <div className="flex-1"><PitcherLine pitcher={prob.awayPitcher} /></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {bet.homeTeam?.logo && <img src={bet.homeTeam.logo} className="w-3.5 h-3.5 object-contain opacity-60" alt="" />}
+                      <div className="flex-1"><PitcherLine pitcher={prob.homePitcher} /></div>
+                    </div>
+                  </div>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </section>
@@ -993,6 +1105,8 @@ const ScoresPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeLeague, setActiveLeague] = useState('all');
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [mlbProbables, setMlbProbables] = useState({});
+  const [showLineups, setShowLineups] = useState({});
 
   const load = () => {
     fetchScores().then(g => {
@@ -1004,6 +1118,7 @@ const ScoresPage = () => {
 
   useEffect(() => {
     load();
+    fetchMLBProbables().then(setMlbProbables);
     const id = setInterval(load, 30000);
     return () => clearInterval(id);
   }, []);
@@ -1014,38 +1129,101 @@ const ScoresPage = () => {
   const final = filtered.filter(g => g.isFinal);
   const upcoming = filtered.filter(g => !g.isLive && !g.isFinal);
 
-  const GameCard = ({ g }) => (
-    <Link to={`/game/${g.league}/${g.id}`}
-      className="bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-2xl p-4 transition-all group block">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-2 py-0.5 rounded-full">{g.leagueLabel}</span>
-        {g.isLive
-          ? <span className="flex items-center gap-1.5 text-[#E21111] text-[10px] font-black uppercase">
-              <span className="w-2 h-2 rounded-full bg-[#E21111] animate-pulse" />{g.statusText}
-            </span>
-          : <span className="text-[#555] text-[10px] font-bold uppercase">{g.isFinal ? 'Final' : g.statusText}</span>
-        }
-      </div>
-      <div className="space-y-3">
-        {[g.away, g.home].map((team, ti) => (
-          <div key={ti} className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {team.logo
-                ? <img src={team.logo} alt={team.name} className="w-8 h-8 object-contain" />
-                : <div className="w-8 h-8 rounded-full bg-[#2a2a2a] flex items-center justify-center text-[10px] font-black text-[#555]">{team.name?.[0]}</div>
-              }
-              <span className="text-[#f0ebe0] font-bold text-sm">{team.name}</span>
-            </div>
-            <span className={`text-xl font-black tabular-nums ${g.isLive ? 'text-[#f0ebe0]' : 'text-[#666]'}`}>{team.score}</span>
+  const GameCard = ({ g }) => {
+    const probKey = `${g.away.name}@${g.home.name}`;
+    const prob = g.league === 'mlb' ? (mlbProbables[probKey] || null) : null;
+    const lineupOpen = showLineups[g.id];
+
+    return (
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-2xl overflow-hidden transition-all group">
+        <Link to={`/game/${g.league}/${g.id}`} className="block p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#555] bg-[#2a2a2a] px-2 py-0.5 rounded-full">{g.leagueLabel}</span>
+            {g.isLive
+              ? <span className="flex items-center gap-1.5 text-[#E21111] text-[10px] font-black uppercase">
+                  <span className="w-2 h-2 rounded-full bg-[#E21111] animate-pulse" />{g.statusText}
+                </span>
+              : <span className="text-[#555] text-[10px] font-bold uppercase">{g.isFinal ? 'Final' : g.statusText}</span>
+            }
           </div>
-        ))}
+          <div className="space-y-3">
+            {[g.away, g.home].map((team, ti) => (
+              <div key={ti} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {team.logo
+                    ? <img src={team.logo} alt={team.name} className="w-8 h-8 object-contain" />
+                    : <div className="w-8 h-8 rounded-full bg-[#2a2a2a] flex items-center justify-center text-[10px] font-black text-[#555]">{team.name?.[0]}</div>
+                  }
+                  <div>
+                    <span className="text-[#f0ebe0] font-bold text-sm block">{team.name}</span>
+                    {/* Probable pitcher inline */}
+                    {prob && (
+                      <span className="text-[#555] text-[9px]">
+                        {ti === 0
+                          ? (prob.awayPitcher ? `SP: ${prob.awayPitcher.name.split(' ').pop()}` : 'SP: TBD')
+                          : (prob.homePitcher ? `SP: ${prob.homePitcher.name.split(' ').pop()}` : 'SP: TBD')
+                        }
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className={`text-xl font-black tabular-nums ${g.isLive ? 'text-[#f0ebe0]' : 'text-[#666]'}`}>{team.score}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 pt-3 border-t border-[#2a2a2a] flex items-center justify-between">
+            <span className="text-[#555] text-[10px]">View Game Preview</span>
+            <ChevronRight size={12} className="text-[#333] group-hover:text-[#E21111] transition-colors" />
+          </div>
+        </Link>
+
+        {/* MLB expanded section: pitchers + lineups */}
+        {prob && (
+          <div className="border-t border-[#2a2a2a] bg-[#141414]">
+            {/* Probable Pitchers */}
+            <div className="px-4 py-3 space-y-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#555] mb-2">Probable Pitchers</p>
+              <div className="flex items-center gap-2">
+                {g.away.logo && <img src={g.away.logo} className="w-4 h-4 object-contain opacity-70" alt="" />}
+                <div className="flex-1"><PitcherLine pitcher={prob.awayPitcher} side="away" /></div>
+              </div>
+              <div className="flex items-center gap-2">
+                {g.home.logo && <img src={g.home.logo} className="w-4 h-4 object-contain opacity-70" alt="" />}
+                <div className="flex-1"><PitcherLine pitcher={prob.homePitcher} side="home" /></div>
+              </div>
+            </div>
+
+            {/* Lineup toggle */}
+            <button
+              onClick={() => setShowLineups(s => ({ ...s, [g.id]: !s[g.id] }))}
+              className="w-full px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#E21111] hover:bg-[#1a1a1a] transition-colors flex items-center justify-between border-t border-[#2a2a2a]"
+            >
+              <span>Starting Lineups</span>
+              <span className="text-[#555]">{lineupOpen ? '▲' : '▼'}</span>
+            </button>
+            {lineupOpen && (
+              <div className="px-4 pb-4 grid grid-cols-2 gap-x-4 gap-y-1 pt-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#555] mb-1 col-span-1 flex items-center gap-1">
+                  {g.away.logo && <img src={g.away.logo} className="w-3 h-3 object-contain" alt="" />} {g.away.name}
+                </p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#555] mb-1 col-span-1 flex items-center gap-1">
+                  {g.home.logo && <img src={g.home.logo} className="w-3 h-3 object-contain" alt="" />} {g.home.name}
+                </p>
+                {(prob.awayLineup?.length || prob.homeLineup?.length) ? (
+                  <>
+                    <div className="space-y-1"><LineupList players={prob.awayLineup} /></div>
+                    <div className="space-y-1"><LineupList players={prob.homeLineup} /></div>
+                  </>
+                ) : (
+                  <p className="col-span-2 text-[#555] text-[10px] italic py-1">Lineups posted ~1 hr before first pitch</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      <div className="mt-3 pt-3 border-t border-[#2a2a2a] flex items-center justify-between">
-        <span className="text-[#555] text-[10px]">View Game Preview</span>
-        <ChevronRight size={12} className="text-[#333] group-hover:text-[#E21111] transition-colors" />
-      </div>
-    </Link>
-  );
+    );
+  };
 
   const Section = ({ title, dot, games: list }) => list.length === 0 ? null : (
     <div className="mb-8">
