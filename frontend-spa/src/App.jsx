@@ -2762,15 +2762,15 @@ const NBAFinalsGame2Article = () => {
 
         {/* Lede */}
         <p className="text-xl md:text-2xl font-bold leading-relaxed text-[#f0ebe0] mb-8 border-l-4 border-[#E21111] pl-6">
-          Go crazy, New York. The red-hot Knicks are going home two wins away from an NBA championship the city has been waiting to see for generations.
+          53 years. That's how long New York has been waiting. And right now, the Knicks are two wins away from ending every single second of it.
         </p>
 
         <p className="text-[#bbb] leading-relaxed text-base mb-6">
-          Jalen Brunson hit a go-ahead free throw with 9.5 seconds left after a Victor Wembanyama turnover moments earlier, then Wembanyama missed a jumper at the buzzer as New York escaped Frost Bank Center with a 105-104 win over the San Antonio Spurs on Friday night — taking a commanding 2-0 lead in the NBA Finals.
+          Let's be honest — nobody expected this to go down the way it did. San Antonio was the better team for three quarters. Frost Bank Center was rocking. Wembanyama had that look in his eyes like he was about to close this thing out on his own. And then the fourth quarter happened, and the Knicks did what this Knicks team does: they made you believe they were finished, and then they weren't.
         </p>
 
         <p className="text-[#bbb] leading-relaxed text-base mb-6">
-          Karl-Anthony Towns stuffed the stat sheet with 21 points and 13 rebounds. Brunson and Mikal Bridges each scored 20 for the Knicks, who have now won 13 straight playoff games — the second-longest streak in NBA playoff history.
+          Brunson drew the foul when it mattered most. Hit both free throws. Wemby had his shot to answer and the ball rimmed out. Final: 105-104 New York. Series: 2-0 Knicks. The city of San Antonio went silent, and somewhere in Manhattan, people started making plans for Monday night.
         </p>
 
         {/* Pull Quote */}
@@ -2780,7 +2780,7 @@ const NBAFinalsGame2Article = () => {
         </blockquote>
 
         <p className="text-[#bbb] leading-relaxed text-base mb-6">
-          New York is now just the third team in Finals history to win the first two games on the road, joining Michael Jordan's 1993 Chicago Bulls and Hakeem Olajuwon's 1995 Houston Rockets. Both of those teams went on to win championships.
+          KAT was a problem all night — 21 and 13, physical, making San Antonio pay every time they tried to sag off. Bridges knocked down big shots when the Knicks needed breathing room. This isn't a one-man team anymore, and that's exactly why they're dangerous. Wembanyama dropped 29, and it still wasn't enough. That should scare every Spurs fan reading this.
         </p>
 
         {/* Stats Grid */}
@@ -2806,26 +2806,22 @@ const NBAFinalsGame2Article = () => {
         </div>
 
         <p className="text-[#bbb] leading-relaxed text-base mb-6">
-          Wembanyama was largely quiet in the first half but put San Antonio on his back in the fourth quarter, finishing with 29 points. His three-point play with 57 seconds left gave the Spurs their first lead in nearly two quarters, 104-102. The arena erupted — and then, in the span of 48 seconds, it all fell apart.
+          Here's the thing about Wemby: he's 22. This is his first Finals. He just gave you 29 points on the road in a one-possession game and his team still lost. That's not on him. The Spurs need Pop's ghost to show up and figure out how to stop a Knicks offense that has been picking apart every defense thrown at it since mid-April.
         </p>
 
         <p className="text-[#bbb] leading-relaxed text-base mb-6">
-          Brunson answered with a mid-range jumper to tie it. Wembanyama missed a long two. OG Anunoby grabbed the rebound with 30 seconds left, the Knicks called time. The Spurs forced a stop, but Wembanyama threw the inbound pass away. Brunson drew the foul, hit both free throws, and before long Spurs fans were filing out — possibly for the last time this season.
-        </p>
-
-        <p className="text-[#bbb] leading-relaxed text-base mb-6">
-          The Spurs called their final timeout with 7.5 seconds left. Fox took the inbound, set up Wembanyama at the elbow. The shot went up, rattled off the rim, and it was over.
+          The turnover at the end — that's the play that'll haunt San Antonio. Not the missed buzzer shot, not the defensive breakdown in the second half. The turnover. You had the lead. You had home court. And the ball ended up out of bounds with 9.5 seconds left. That's a championship-changing mistake, and everybody in that building knew it the second it happened.
         </p>
 
         {/* Divider */}
         <div className="border-t border-[#2a2a2a] my-10" />
 
-        <h2 className="text-2xl font-black uppercase italic text-[#f0ebe0] mb-4">What's Next</h2>
+        <h2 className="text-2xl font-black uppercase italic text-[#f0ebe0] mb-4">Where This Series Goes Next</h2>
         <p className="text-[#bbb] leading-relaxed text-base mb-6">
-          The series shifts to Madison Square Garden for Game 3 on Monday night. President Trump — a native New Yorker — is expected in attendance, and secondary market tickets for the worst seats at MSG were approaching $9,000 on Friday night. The Knicks haven't won a championship since 1973.
+          Game 3 is at Madison Square Garden, and if you think that building is going to be loud, you haven't been to MSG in June with the Knicks two wins from a title. The energy in that city right now is something else. Tickets are going for insane money. The whole country is tuned in.
         </p>
         <p className="text-[#bbb] leading-relaxed text-base mb-8">
-          For the Spurs, the window to respond is now. Victor Wembanyama, 22 years old and already one of the most dominant players on the planet, needs a defining performance on the road — or this series could be over before it ever gets back to San Antonio.
+          San Antonio needs a win badly — not just for the series, but for the narrative. You can't let this become a sweep conversation. Wembanyama needs a statement performance, Fox needs to be Fox, and someone off the bench needs to give them 15 quiet points the Knicks don't see coming. Otherwise? Start planning the parade route on Fifth Avenue.
         </p>
 
         {/* Back link */}
