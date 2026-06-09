@@ -21,6 +21,98 @@ const ChevronRight = ({ size, className }) => <Icon size={size} className={class
 const FireIcon = ({ size, className }) => <Icon size={size} className={className} d="M12 2c0 0-5 4-5 9a5 5 0 0 0 10 0c0-5-5-9-5-9z" />;
 const UserIcon = ({ size, className }) => <Icon size={size} className={className} d={["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"]} />;
 const BellIcon = ({ size, className }) => <Icon size={size} className={className} d={["M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9", "M13.73 21a2 2 0 0 1-3.46 0"]} />;
+const CheckIcon = ({ size, className }) => <Icon size={size} className={className} d="M20 6L9 17l-5-5" />;
+const MailIcon = ({ size, className }) => <Icon size={size} className={className} d={["M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z", "M22 6l-10 7L2 6"]} />;
+
+// ─── JOIN MODAL ───────────────────────────────────────────────────────────────
+const BBT_USER_KEY = 'bbt_user';
+const getStoredUser = () => { try { return JSON.parse(localStorage.getItem(BBT_USER_KEY)); } catch { return null; } };
+
+const JoinModal = ({ onClose }) => {
+  const [step, setStep] = useState('form'); // 'form' | 'success'
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) { setError('Enter your name'); return; }
+    if (!/\S+@\S+\.\S+/.test(email)) { setError('Enter a valid email'); return; }
+    setLoading(true);
+    setError('');
+    // Save to localStorage
+    await new Promise(r => setTimeout(r, 800));
+    localStorage.setItem(BBT_USER_KEY, JSON.stringify({ name: name.trim(), email: email.trim(), joined: true, team: null }));
+    setLoading(false);
+    setStep('success');
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md bg-[#141414] border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="relative bg-gradient-to-br from-[#E21111]/20 to-transparent p-8 pb-6 border-b border-[#2a2a2a]">
+          <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[#555] hover:text-[#f0ebe0] transition-colors">
+            <XIcon size={16} />
+          </button>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-[#E21111] rounded-lg flex items-center justify-center">
+              <span className="text-white text-[11px] font-black">BBT</span>
+            </div>
+            <div>
+              <div className="text-[#f0ebe0] font-black text-lg uppercase tracking-tight leading-none">Join the Talk</div>
+              <div className="text-[#555] text-[11px] mt-0.5">BounceBackTalk · Free forever</div>
+            </div>
+          </div>
+          <p className="text-[#888] text-sm">Get daily best bets, live scores, and NBA Finals coverage straight to your inbox.</p>
+        </div>
+
+        {step === 'form' ? (
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Your Name</label>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Arthur"
+                className="w-full bg-[#1a1a1a] border border-[#2a2a2a] focus:border-[#E21111] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder-[#444] outline-none transition-colors" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#555] block mb-1.5">Email Address</label>
+              <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="you@example.com"
+                className="w-full bg-[#1a1a1a] border border-[#2a2a2a] focus:border-[#E21111] rounded-xl px-4 py-3 text-[#f0ebe0] text-sm placeholder-[#444] outline-none transition-colors" />
+            </div>
+            {error && <p className="text-[#E21111] text-xs font-bold">{error}</p>}
+            <button type="submit" disabled={loading}
+              className="w-full bg-[#E21111] hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed rounded-xl py-3.5 text-white text-[12px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2">
+              {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <MailIcon size={13} />}
+              {loading ? 'Joining...' : 'Join Free'}
+            </button>
+            <p className="text-[#444] text-[10px] text-center leading-relaxed">No spam. Unsubscribe anytime. Full accounts coming soon.</p>
+          </form>
+        ) : (
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-green-400/10 border border-green-400/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckIcon size={28} className="text-green-400" />
+            </div>
+            <h3 className="text-[#f0ebe0] font-black text-xl uppercase tracking-tight mb-2">You're In!</h3>
+            <p className="text-[#888] text-sm mb-1">Welcome to BounceBackTalk, <span className="text-[#f0ebe0] font-bold">{name}</span>.</p>
+            <p className="text-[#555] text-xs mb-6">First picks drop tomorrow morning. Check your profile to pick your favorite team.</p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 py-2.5 border border-[#2a2a2a] rounded-xl text-[#888] text-[11px] font-black uppercase tracking-widest hover:text-[#f0ebe0] transition-colors">
+                Close
+              </button>
+              <Link to="/profile" onClick={onClose} className="flex-1 py-2.5 bg-[#E21111] rounded-xl text-white text-[11px] font-black uppercase tracking-widest text-center hover:bg-red-700 transition-colors">
+                My Profile
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ─── ESPN API ─────────────────────────────────────────────────────────────────
 const LEAGUES = [
@@ -303,6 +395,9 @@ const Ticker = ({ games }) => {
 const Nav = ({ onSearch }) => {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
+  const user = getStoredUser();
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', fn);
@@ -344,14 +439,21 @@ const Nav = ({ onSearch }) => {
             className="w-8 h-8 flex items-center justify-center text-[#888] hover:text-[#f0ebe0] transition-colors">
             <SearchIcon size={16} />
           </button>
-          <Link to="/login"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-[#2a2a2a] rounded text-[11px] font-black uppercase tracking-widest text-[#888] hover:text-[#f0ebe0] hover:border-[#444] transition-all">
-            <UserIcon size={12} /> Sign In
-          </Link>
-          <Link to="/register"
-            className="px-3 py-1.5 bg-[#E21111] rounded text-[11px] font-black uppercase tracking-widest text-white hover:bg-red-700 transition-colors">
-            Join
-          </Link>
+          {user ? (
+            <Link to="/profile"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-[#2a2a2a] rounded text-[11px] font-black uppercase tracking-widest text-[#888] hover:text-[#f0ebe0] hover:border-[#444] transition-all">
+              <UserIcon size={12} /> {user.name.split(' ')[0]}
+            </Link>
+          ) : (
+            <button onClick={() => setShowJoin(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-[#2a2a2a] rounded text-[11px] font-black uppercase tracking-widest text-[#888] hover:text-[#f0ebe0] hover:border-[#444] transition-all">
+              <UserIcon size={12} /> Sign In
+            </button>
+          )}
+          <button onClick={() => user ? null : setShowJoin(true)}
+            className={`px-3 py-1.5 rounded text-[11px] font-black uppercase tracking-widest transition-colors ${user ? 'bg-green-500/10 border border-green-500/30 text-green-400 cursor-default' : 'bg-[#E21111] text-white hover:bg-red-700'}`}>
+            {user ? '✓ Joined' : 'Join'}
+          </button>
           <button onClick={() => setOpen(!open)} className="lg:hidden w-8 h-8 flex items-center justify-center text-[#888]">
             {open ? <XIcon size={18} /> : <MenuIcon size={18} />}
           </button>
@@ -368,17 +470,28 @@ const Nav = ({ onSearch }) => {
             </Link>
           ))}
           <div className="p-4 flex gap-3">
-            <Link to="/login" onClick={() => setOpen(false)}
-              className="flex-1 text-center py-2.5 border border-[#2a2a2a] rounded text-[11px] font-black uppercase text-[#888]">
-              Sign In
-            </Link>
-            <Link to="/register" onClick={() => setOpen(false)}
-              className="flex-1 text-center py-2.5 bg-[#E21111] rounded text-[11px] font-black uppercase text-white">
-              Join Free
-            </Link>
+            {user ? (
+              <Link to="/profile" onClick={() => setOpen(false)}
+                className="flex-1 text-center py-2.5 border border-[#2a2a2a] rounded text-[11px] font-black uppercase text-[#888]">
+                My Profile
+              </Link>
+            ) : (
+              <button onClick={() => { setShowJoin(true); setOpen(false); }}
+                className="flex-1 text-center py-2.5 border border-[#2a2a2a] rounded text-[11px] font-black uppercase text-[#888]">
+                Sign In
+              </button>
+            )}
+            {!user && (
+              <button onClick={() => { setShowJoin(true); setOpen(false); }}
+                className="flex-1 text-center py-2.5 bg-[#E21111] rounded text-[11px] font-black uppercase text-white">
+                Join Free
+              </button>
+            )}
           </div>
         </div>
       )}
+
+      {showJoin && <JoinModal onClose={() => setShowJoin(false)} />}
     </nav>
   );
 };
@@ -1087,7 +1200,7 @@ const BottomNav = () => (
         { label: 'Scores', icon: '📊', href: '/scores' },
         { label: 'Bets', icon: '🎯', href: '/best-bets' },
         { label: 'Teams', icon: '🏆', href: '/league/nba' },
-        { label: 'Profile', icon: '👤', href: '/login' },
+        { label: 'Profile', icon: '👤', href: '/profile' },
       ].map(item => (
         <Link key={item.href} to={item.href}
           className="flex flex-col items-center justify-center gap-0.5 text-[#555] hover:text-[#f0ebe0] transition-colors active:text-[#E21111]">
@@ -3111,6 +3224,168 @@ const NBAFinalsGame2Article = () => {
   );
 };
 
+// ─── PROFILE PAGE ─────────────────────────────────────────────────────────────
+const NBA_TEAMS = [
+  { abbr: 'ATL', name: 'Hawks',        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/atl.png' },
+  { abbr: 'BOS', name: 'Celtics',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/bos.png' },
+  { abbr: 'BKN', name: 'Nets',         logo: 'https://a.espncdn.com/i/teamlogos/nba/500/bkn.png' },
+  { abbr: 'CHA', name: 'Hornets',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/cha.png' },
+  { abbr: 'CHI', name: 'Bulls',        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/chi.png' },
+  { abbr: 'CLE', name: 'Cavaliers',    logo: 'https://a.espncdn.com/i/teamlogos/nba/500/cle.png' },
+  { abbr: 'DAL', name: 'Mavericks',    logo: 'https://a.espncdn.com/i/teamlogos/nba/500/dal.png' },
+  { abbr: 'DEN', name: 'Nuggets',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/den.png' },
+  { abbr: 'DET', name: 'Pistons',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/det.png' },
+  { abbr: 'GSW', name: 'Warriors',     logo: 'https://a.espncdn.com/i/teamlogos/nba/500/gs.png' },
+  { abbr: 'HOU', name: 'Rockets',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/hou.png' },
+  { abbr: 'IND', name: 'Pacers',       logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ind.png' },
+  { abbr: 'LAC', name: 'Clippers',     logo: 'https://a.espncdn.com/i/teamlogos/nba/500/lac.png' },
+  { abbr: 'LAL', name: 'Lakers',       logo: 'https://a.espncdn.com/i/teamlogos/nba/500/lal.png' },
+  { abbr: 'MEM', name: 'Grizzlies',    logo: 'https://a.espncdn.com/i/teamlogos/nba/500/mem.png' },
+  { abbr: 'MIA', name: 'Heat',         logo: 'https://a.espncdn.com/i/teamlogos/nba/500/mia.png' },
+  { abbr: 'MIL', name: 'Bucks',        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/mil.png' },
+  { abbr: 'MIN', name: 'Timberwolves', logo: 'https://a.espncdn.com/i/teamlogos/nba/500/min.png' },
+  { abbr: 'NOP', name: 'Pelicans',     logo: 'https://a.espncdn.com/i/teamlogos/nba/500/no.png' },
+  { abbr: 'NYK', name: 'Knicks',       logo: 'https://a.espncdn.com/i/teamlogos/nba/500/ny.png' },
+  { abbr: 'OKC', name: 'Thunder',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/okc.png' },
+  { abbr: 'ORL', name: 'Magic',        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/orl.png' },
+  { abbr: 'PHI', name: '76ers',        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/phi.png' },
+  { abbr: 'PHX', name: 'Suns',         logo: 'https://a.espncdn.com/i/teamlogos/nba/500/phx.png' },
+  { abbr: 'POR', name: 'Trail Blazers',logo: 'https://a.espncdn.com/i/teamlogos/nba/500/por.png' },
+  { abbr: 'SAC', name: 'Kings',        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/sac.png' },
+  { abbr: 'SAS', name: 'Spurs',        logo: 'https://a.espncdn.com/i/teamlogos/nba/500/sa.png' },
+  { abbr: 'TOR', name: 'Raptors',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/tor.png' },
+  { abbr: 'UTA', name: 'Jazz',         logo: 'https://a.espncdn.com/i/teamlogos/nba/500/utah.png' },
+  { abbr: 'WAS', name: 'Wizards',      logo: 'https://a.espncdn.com/i/teamlogos/nba/500/wsh.png' },
+];
+
+const ProfilePage = () => {
+  const [user, setUser] = useState(getStoredUser());
+  const [showJoin, setShowJoin] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const selectTeam = (abbr) => {
+    const updated = { ...user, team: abbr };
+    localStorage.setItem(BBT_USER_KEY, JSON.stringify(updated));
+    setUser(updated);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleLeave = () => {
+    localStorage.removeItem(BBT_USER_KEY);
+    setUser(null);
+  };
+
+  if (!user) return (
+    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center px-4">
+      <div className="max-w-md w-full text-center">
+        <div className="w-20 h-20 bg-[#1a1a1a] border border-[#2a2a2a] rounded-full flex items-center justify-center mx-auto mb-6">
+          <UserIcon size={32} className="text-[#444]" />
+        </div>
+        <h1 className="text-[#f0ebe0] font-black text-2xl uppercase tracking-tight mb-2">No Profile Yet</h1>
+        <p className="text-[#555] text-sm mb-6">Join BounceBackTalk to save your favorite team, track picks, and get daily best bets in your inbox.</p>
+        <button onClick={() => setShowJoin(true)}
+          className="px-8 py-3.5 bg-[#E21111] hover:bg-red-700 rounded-xl text-white text-[12px] font-black uppercase tracking-widest transition-colors">
+          Join Free
+        </button>
+        {showJoin && <JoinModal onClose={() => { setShowJoin(false); setUser(getStoredUser()); }} />}
+      </div>
+    </div>
+  );
+
+  const favTeam = NBA_TEAMS.find(t => t.abbr === user.team);
+  const initials = user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  return (
+    <div className="min-h-screen bg-[#0f0f0f]">
+      {/* Hero banner */}
+      <div className="bg-gradient-to-br from-[#E21111]/15 via-[#1a1a1a] to-[#0f0f0f] border-b border-[#2a2a2a]">
+        <div className="max-w-3xl mx-auto px-4 py-10 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          {/* Avatar */}
+          <div className="w-20 h-20 bg-[#E21111] rounded-2xl flex items-center justify-center shrink-0">
+            <span className="text-white text-2xl font-black">{initials}</span>
+          </div>
+          <div className="text-center sm:text-left">
+            <div className="text-[10px] font-black uppercase tracking-widest text-[#E21111] mb-1">Member</div>
+            <h1 className="text-[#f0ebe0] font-black text-3xl uppercase tracking-tight leading-none mb-1">{user.name}</h1>
+            <p className="text-[#555] text-sm">{user.email}</p>
+            {favTeam && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-3 py-1.5">
+                <img src={favTeam.logo} className="w-4 h-4 object-contain" alt={favTeam.name} />
+                <span className="text-[#888] text-[10px] font-black uppercase tracking-wider">{favTeam.name} fan</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+
+        {/* Favorite team */}
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-[#f0ebe0] font-black text-base uppercase tracking-tight">Favorite NBA Team</h2>
+              <p className="text-[#555] text-xs mt-0.5">Your picks feed will be tailored around this team</p>
+            </div>
+            {saved && (
+              <span className="flex items-center gap-1 text-green-400 text-[10px] font-black uppercase tracking-wider">
+                <CheckIcon size={12} /> Saved
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+            {NBA_TEAMS.map(t => (
+              <button key={t.abbr} onClick={() => selectTeam(t.abbr)}
+                title={t.name}
+                className={`aspect-square rounded-xl flex items-center justify-center p-2 transition-all border ${
+                  user.team === t.abbr
+                    ? 'border-[#E21111] bg-[#E21111]/10'
+                    : 'border-[#2a2a2a] bg-[#141414] hover:border-[#444]'
+                }`}>
+                <img src={t.logo} className="w-full h-full object-contain" alt={t.name} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* What's coming */}
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+          <h2 className="text-[#f0ebe0] font-black text-base uppercase tracking-tight mb-1">Coming Soon</h2>
+          <p className="text-[#555] text-xs mb-5">Full accounts are on the way. Here's what's dropping next:</p>
+          <div className="space-y-3">
+            {[
+              { icon: '🎯', label: 'Pick Tracker', desc: 'Save today\'s best bets and track your record over time' },
+              { icon: '🔔', label: 'Game Alerts',  desc: 'Get notified when your team\'s game goes live' },
+              { icon: '📰', label: 'Saved Articles', desc: 'Bookmark any article or game preview to read later' },
+              { icon: '📊', label: 'Stats Dashboard', desc: 'Your personal win rate, ROI, and betting trends' },
+            ].map(f => (
+              <div key={f.label} className="flex items-start gap-4 py-3 border-t border-[#252525] first:border-0">
+                <span className="text-2xl leading-none mt-0.5">{f.icon}</span>
+                <div>
+                  <div className="text-[#f0ebe0] font-black text-sm">{f.label}</div>
+                  <div className="text-[#555] text-xs mt-0.5">{f.desc}</div>
+                </div>
+                <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-[#444] bg-[#252525] px-2 py-1 rounded-full shrink-0">Soon</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Danger zone */}
+        <div className="border border-[#2a2a2a] rounded-2xl p-6">
+          <h2 className="text-[#f0ebe0] font-black text-sm uppercase tracking-tight mb-3">Account</h2>
+          <button onClick={handleLeave}
+            className="text-[#555] hover:text-[#E21111] text-xs font-bold uppercase tracking-wider transition-colors">
+            Leave the waitlist
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const [email, setEmail]       = useState('');
@@ -3516,6 +3791,7 @@ export default function App() {
             <Route path="/team/:league/:id" element={<TeamPage />} />
             <Route path="/player/:id" element={<PlayerPage />} />
             <Route path="/article/nba-finals-game-2" element={<NBAFinalsGame2Article />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Routes>
