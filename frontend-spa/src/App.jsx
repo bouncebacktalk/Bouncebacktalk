@@ -560,73 +560,111 @@ const genAnalysis = (league, fav, dog, spread, total, isTotal) => {
 };
 
 const fetchBestBets = async () => {
-  const allGames = await fetchScores();
-  const candidates = allGames.filter(g => !g.isFinal).slice(0, 12);
+  // Use today's date explicitly so bets are always current
+  const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
-  const bets = await Promise.all(candidates.map(async g => {
-    try {
-      const sportPath = ESPN_SPORT_PATH[g.league];
-      if (!sportPath) return null;
-      const res = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/summary?event=${g.id}`
-      );
-      const data = await res.json();
-      const pc = data.pickcenter?.[0];
-      if (!pc) return null;
+  const results = await Promise.allSettled(
+    LEAGUES.map(l =>
+      fetch(`https://site.api.espn.com/apis/site/v2/sports/${l.sport}/${l.key}/scoreboard?dates=${todayStr}`)
+        .then(r => r.json())
+        .then(d => ({ league: l.key, events: d.events || [] }))
+    )
+  );
 
-      const homeSpread  = pc.spread ?? null;
-      const total       = pc.overUnder ?? null;
-      const homeML      = pc.homeTeamOdds?.moneyLine ?? null;
-      const awayML      = pc.awayTeamOdds?.moneyLine ?? null;
-      const homeSpOdds  = pc.homeTeamOdds?.spreadOdds ?? -110;
-      const awaySpOdds  = pc.awayTeamOdds?.spreadOdds ?? -110;
-      const overOdds    = pc.overOdds ?? -110;
+  const bets = [];
 
-      let pick, odds, confidence, isTotal = false, fav, dog;
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    const { league, events } = result.value;
 
-      if (homeSpread != null && Math.abs(homeSpread) >= 1.5) {
-        if (homeSpread < 0) {
-          pick = `${g.home.name} ${homeSpread}`;
-          odds = fmtOdds(homeSpOdds);
-          fav = g.home.name; dog = g.away.name;
-        } else {
-          pick = `${g.away.name} -${homeSpread}`;
-          odds = fmtOdds(awaySpOdds);
-          fav = g.away.name; dog = g.home.name;
-        }
-        confidence = calcConfidence(homeSpread, null);
-      } else if (total != null) {
-        pick = `Over ${total}`;
-        odds = fmtOdds(overOdds);
-        confidence = 71; isTotal = true;
-        fav = g.home.name; dog = g.away.name;
-      } else if (homeML != null && awayML != null) {
-        if (homeML <= awayML) {
-          pick = `${g.home.name} ML`; odds = fmtOdds(homeML);
-          fav = g.home.name; dog = g.away.name;
-        } else {
-          pick = `${g.away.name} ML`; odds = fmtOdds(awayML);
-          fav = g.away.name; dog = g.home.name;
-        }
-        confidence = calcConfidence(null, homeML <= awayML ? homeML : awayML);
-      } else return null;
+    for (const ev of events) {
+      try {
+        const comp = ev.competitions?.[0];
+        if (!comp) continue;
+        const status = comp.status?.type;
+        // Only upcoming or live games — not final
+        if (status?.completed) continue;
 
-      return {
-        id: `${g.league}-${g.id}`,
-        gameId: g.id,
-        league: g.league.toUpperCase(),
-        leagueKey: g.league,
-        game: `${g.away.name} vs ${g.home.name}`,
-        pick, odds, confidence,
-        trend: `+${Math.floor(Math.abs(g.id.charCodeAt?.(0) ?? 5) % 15 + 4)}%`,
-        value: confidence >= 82 ? 'HIGH' : confidence >= 72 ? 'MED' : 'VALUE',
-        analysis: genAnalysis(g.league, fav, dog, homeSpread, total, isTotal),
-        time: g.statusText || 'Today',
-        awayTeam: g.away,
-        homeTeam: g.home,
-      };
-    } catch { return null; }
-  }));
+        const home = comp.competitors?.find(c => c.homeAway === 'home');
+        const away = comp.competitors?.find(c => c.homeAway === 'away');
+        if (!home || !away) continue;
+
+        const pc = comp.odds?.[0];
+        if (!pc) continue;
+
+        // Pull lines directly from scoreboard odds object
+        const awayML  = parseInt(pc.moneyline?.away?.close?.odds ?? pc.awayTeamOdds?.moneyLine ?? 0);
+        const homeML  = parseInt(pc.moneyline?.home?.close?.odds ?? pc.homeTeamOdds?.moneyLine ?? 0);
+        const awayRL  = pc.pointSpread?.away?.close?.line;  // e.g. "-1.5"
+        const homeRL  = pc.pointSpread?.home?.close?.line;  // e.g. "+1.5"
+        const awayRLO = pc.pointSpread?.away?.close?.odds;  // e.g. "+129"
+        const homeRLO = pc.pointSpread?.home?.close?.odds;  // e.g. "-156"
+        const total   = pc.overUnder ?? null;
+        const overOdds  = pc.total?.over?.close?.odds  ?? '-110';
+        const underOdds = pc.total?.under?.close?.odds ?? '-110';
+        const summaryLine = pc.details ?? ''; // e.g. "NYY -131"
+
+        const homeName = home.team?.abbreviation || home.team?.name || 'HOME';
+        const awayName = away.team?.abbreviation || away.team?.name || 'AWAY';
+        const homeLogo = home.team?.logo || '';
+        const awayLogo = away.team?.logo || '';
+
+        let pick, odds, confidence, isTotal = false, fav, dog;
+
+        // Best pick logic: prefer run/puck line if spread >= 1.5, else ML fav, else total
+        const rlVal = awayRL ? parseFloat(awayRL) : null;
+
+        if (rlVal != null && Math.abs(rlVal) >= 1.5 && (awayRLO || homeRLO)) {
+          // Spread/runline: pick the favourite side
+          if (rlVal < 0) {
+            pick = `${awayName} ${awayRL}`;
+            odds = awayRLO || '-110';
+            fav = awayName; dog = homeName;
+          } else {
+            pick = `${homeName} ${homeRL}`;
+            odds = homeRLO || '-110';
+            fav = homeName; dog = awayName;
+          }
+          confidence = calcConfidence(rlVal, null);
+        } else if (awayML && homeML && (awayML !== 0 || homeML !== 0)) {
+          // Moneyline: pick the favourite
+          if (awayML < homeML) {
+            pick = `${awayName} ML`; odds = awayML > 0 ? `+${awayML}` : `${awayML}`;
+            fav = awayName; dog = homeName;
+            confidence = calcConfidence(null, awayML);
+          } else {
+            pick = `${homeName} ML`; odds = homeML > 0 ? `+${homeML}` : `${homeML}`;
+            fav = homeName; dog = awayName;
+            confidence = calcConfidence(null, homeML);
+          }
+        } else if (total != null) {
+          pick = `Over ${total}`;
+          odds = overOdds;
+          confidence = 68; isTotal = true;
+          fav = awayName; dog = homeName;
+        } else continue;
+
+        const gameTime = comp.date
+          ? new Date(comp.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
+          : 'Today';
+
+        bets.push({
+          id: `${league}-${ev.id}`,
+          gameId: ev.id,
+          league: league.toUpperCase(),
+          leagueKey: league,
+          game: `${awayName} vs ${homeName}`,
+          pick, odds, confidence,
+          trend: summaryLine ? `📊 ${summaryLine}` : '',
+          value: confidence >= 82 ? 'HIGH' : confidence >= 72 ? 'MED' : 'VALUE',
+          analysis: genAnalysis(league, fav, dog, rlVal, total, isTotal),
+          time: gameTime,
+          awayTeam: { name: awayName, logo: awayLogo, score: away.score || '' },
+          homeTeam: { name: homeName, logo: homeLogo, score: home.score || '' },
+        });
+      } catch { continue; }
+    }
+  }
 
   return bets.filter(Boolean).sort((a, b) => b.confidence - a.confidence);
 };
