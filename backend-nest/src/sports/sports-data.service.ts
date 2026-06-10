@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 const SPORTSDATA_KEY = process.env.SPORTSDATA_API_KEY ?? '';
+// Sport-specific overrides — add more as you get each sport's key
+const SPORTSDATA_KEYS: Record<string, string> = {
+  MLB: process.env.SPORTSDATA_MLB_KEY ?? SPORTSDATA_KEY,
+};
+function sdKey(sport: string): string {
+  return SPORTSDATA_KEYS[sport.toUpperCase()] ?? SPORTSDATA_KEY;
+}
 const ODDS_API_KEY   = process.env.ODDS_API_KEY ?? '';
 const SPORTSDATA_BASE = 'https://api.sportsdata.io/v3';
 const ODDS_API_BASE   = 'https://api.the-odds-api.com/v4';
@@ -110,7 +117,7 @@ export class SportsDataService {
     const cfg = SCORES_CONFIG[sport.toUpperCase()];
     if (!cfg) return [];
     const d = this.today();
-    const url = `${SPORTSDATA_BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${SPORTSDATA_KEY}`;
+    const url = `${SPORTSDATA_BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${sdKey(sport)}`;
     const raw = await this.fetch<any[]>(url);
     if (!Array.isArray(raw)) return [];
     return raw.map((g: any) => ({
@@ -206,7 +213,7 @@ export class SportsDataService {
     const cfg = SCORES_CONFIG[sport.toUpperCase()];
     if (!cfg) return [];
     const d = date ?? this.today();
-    const url = `${SPORTSDATA_BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${SPORTSDATA_KEY}`;
+    const url = `${SPORTSDATA_BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${sdKey(sport)}`;
     const raw = await this.fetch<any[]>(url);
     if (!Array.isArray(raw)) return [];
     return raw.map((g: any) => ({
