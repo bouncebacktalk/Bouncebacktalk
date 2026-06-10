@@ -2,23 +2,21 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma';
 import { CreateBetDto, UpdateBetDto, BetFilterDto } from './dto/bets.dto';
 import { BetStatus, BetType, Prisma } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class BetsService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: number, dto: CreateBetDto) {
-    const profit = this.calcProfit(dto.status as BetStatus | undefined, dto.stake, dto.payout);
     return this.prisma.bet.create({
       data: {
         userId,
         type: dto.type,
         sportsbook: dto.sportsbook,
-        stake: new Decimal(dto.stake),
+        stake: dto.stake,
         odds: dto.odds,
-        payout: new Decimal(dto.payout),
-        profit: profit !== null ? new Decimal(profit) : null,
+        payout: dto.payout,
+        profit: null,
         notes: dto.notes,
         screenshotUrl: dto.screenshotUrl,
         betDate: dto.betDate ? new Date(dto.betDate) : new Date(),
@@ -37,8 +35,8 @@ export class BetsService {
     if (filter.sportsbook) where.sportsbook = { contains: filter.sportsbook, mode: 'insensitive' };
     if (filter.from || filter.to) {
       where.betDate = {};
-      if (filter.from) where.betDate.gte = new Date(filter.from);
-      if (filter.to) where.betDate.lte = new Date(filter.to + 'T23:59:59Z');
+      if (filter.from) (where.betDate as any).gte = new Date(filter.from);
+      if (filter.to) (where.betDate as any).lte = new Date(filter.to + 'T23:59:59Z');
     }
     return this.prisma.bet.findMany({
       where,
@@ -65,12 +63,12 @@ export class BetsService {
       data: {
         ...(dto.status && { status: dto.status }),
         ...(dto.sportsbook !== undefined && { sportsbook: dto.sportsbook }),
-        ...(dto.stake !== undefined && { stake: new Decimal(dto.stake) }),
+        ...(dto.stake !== undefined && { stake: dto.stake }),
         ...(dto.odds !== undefined && { odds: dto.odds }),
-        ...(dto.payout !== undefined && { payout: new Decimal(dto.payout) }),
+        ...(dto.payout !== undefined && { payout: dto.payout }),
         ...(dto.betDate && { betDate: new Date(dto.betDate) }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
-        profit: profit !== null ? new Decimal(profit) : null,
+        profit: profit,
         settledAt: dto.status && dto.status !== 'PENDING' ? new Date() : bet.settledAt,
       },
       include: { legs: true },
@@ -90,21 +88,21 @@ export class BetsService {
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - todayStart.getDay());
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(todayStart.getDate() - todayStart.getDay());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const yearStart = new Date(now.getFullYear(), 0, 1);
 
     const calc = (bets: typeof all) => {
       const settled = bets.filter(b => b.status === 'WON' || b.status === 'LOST' || b.status === 'PUSH');
       const won = settled.filter(b => b.status === 'WON');
-      const lost = settled.filter(b => b.status === 'LOST');
       const totalStake = settled.reduce((s, b) => s + Number(b.stake), 0);
       const totalProfit = settled.reduce((s, b) => s + (b.profit ? Number(b.profit) : 0), 0);
       const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;
       return {
         bets: settled.length,
         won: won.length,
-        lost: lost.length,
+        lost: settled.filter(b => b.status === 'LOST').length,
         pending: bets.filter(b => b.status === 'PENDING').length,
         profit: totalProfit,
         stake: totalStake,
@@ -123,8 +121,8 @@ export class BetsService {
     };
   }
 
-  private calcProfit(status: BetStatus | undefined, stake: number, payout: number): number | null {
-    if (!status || status === 'PENDING') return null;
+  private calcProfit(status: BetStatus, stake: number, payout: number): number | null {
+    if (status === 'PENDING') return null;
     if (status === 'WON') return payout - stake;
     if (status === 'LOST') return -stake;
     if (status === 'PUSH') return 0;

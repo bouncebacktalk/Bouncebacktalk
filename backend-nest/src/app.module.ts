@@ -28,6 +28,7 @@ import { UsersModule } from "./users";
     UsersModule,
     AuthModule,
     LeadsModule,
+    BetsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

@@ -23,11 +23,11 @@ export class CreateBetLegDto {
 }
 
 export class CreateBetDto {
-  @IsEnum(BetType) type: BetType;
+  @IsEnum(BetType) type!: BetType;
   @IsOptional() @IsString() sportsbook?: string;
-  @IsNumber() @Min(0.01) stake: number;
-  @IsInt() odds: number;
-  @IsNumber() @Min(0) payout: number;
+  @IsNumber() @Min(0.01) stake!: number;
+  @IsInt() odds!: number;
+  @IsNumber() @Min(0) payout!: number;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsString() screenshotUrl?: string;
   @IsOptional() @IsDateString() betDate?: string;
@@ -51,4 +51,7 @@ export class BetFilterDto {
   @IsOptional() @IsString() to?: string;
   @IsOptional() @IsString() sportsbook?: string;
   @IsOptional() @IsEnum(BetType) type?: BetType;
+  @IsOptional() @IsString() limit?: string;
+  @IsOptional() @IsString() offset?: string;
+  @IsOptional() @IsString() search?: string;
 }

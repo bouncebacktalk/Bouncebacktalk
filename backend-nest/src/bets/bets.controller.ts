@@ -14,28 +14,28 @@ import { memoryStorage } from 'multer';
 @Controller('bets')
 export class BetsController {
   constructor(
-    private bets: BetsService,
-    private ocr: OcrService,
+    private betsService: BetsService,
+    private ocrService: OcrService,
   ) {}
 
   @Post()
   create(@CurrentUser('id') userId: number, @Body() dto: CreateBetDto) {
-    return this.bets.create(userId, dto);
+    return this.betsService.create(userId, dto);
   }
 
   @Get()
   findAll(@CurrentUser('id') userId: number, @Query() filter: BetFilterDto) {
-    return this.bets.findAll(userId, filter);
+    return this.betsService.findAll(userId, filter);
   }
 
   @Get('stats')
   stats(@CurrentUser('id') userId: number) {
-    return this.bets.getStats(userId);
+    return this.betsService.getStats(userId);
   }
 
   @Get(':id')
   findOne(@CurrentUser('id') userId: number, @Param('id', ParseIntPipe) id: number) {
-    return this.bets.findOne(userId, id);
+    return this.betsService.findOne(userId, id);
   }
 
   @Patch(':id')
@@ -44,17 +44,17 @@ export class BetsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBetDto,
   ) {
-    return this.bets.update(userId, id, dto);
+    return this.betsService.update(userId, id, dto);
   }
 
   @Delete(':id')
   remove(@CurrentUser('id') userId: number, @Param('id', ParseIntPipe) id: number) {
-    return this.bets.remove(userId, id);
+    return this.betsService.remove(userId, id);
   }
 
   @Post('ocr')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async ocr(@UploadedFile() file: Express.Multer.File) {
-    return this.ocr.extract(file);
+  async extractOcr(@UploadedFile() file: Express.Multer.File) {
+    return this.ocrService.extract(file);
   }
 }
