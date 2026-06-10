@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
-import { Plus, Trash2, Upload, Loader2, CheckCircle, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Plus, Trash2, Upload, Loader2, CheckCircle, X, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { apiGet } from "../api/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,97 @@ import { Badge } from "@/components/ui/badge";
 import { betsApi, type BetStatus, type CreateBetPayload, type OcrResult } from "./bets";
 
 const SPORTSBOOKS = [
-  "DraftKings", "FanDuel", "BetMGM", "Caesars", "PointsBet",
-  "BetRivers", "Barstool", "WynnBET", "Hard Rock", "Other",
+  "DraftKings", "FanDuel", "BetMGM", "Caesars", "ESPN Bet",
+  "Fanatics", "Bet365", "BetRivers", "Barstool", "WynnBET", "Hard Rock", "Other",
 ];
+
+const SPORTS_OPTIONS = ["NBA", "NFL", "MLB", "NHL", "NCAAF", "NCAAB"];
+
+function fmtOddsNum(n: number | null): string {
+  if (n == null) return "—";
+  return n > 0 ? `+${n}` : String(n);
+}
+
+function LiveOddsPanel() {
+  const [open, setOpen] = useState(false);
+  const [sport, setSport] = useState("NBA");
+  const [games, setGames] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    apiGet<any[]>(`/api/sports/odds?sport=${sport}`)
+      .then((data) => setGames(Array.isArray(data) ? data.slice(0, 8) : []))
+      .catch(() => setGames([]))
+      .finally(() => setLoading(false));
+  }, [open, sport]);
+
+  return (
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-2 cursor-pointer" onClick={() => setOpen((o) => !o)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <TrendingUp className="size-4 text-red-400" />
+            Today's Lines
+          </CardTitle>
+          {open ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+        </div>
+      </CardHeader>
+      {open && (
+        <CardContent className="pt-0 space-y-3">
+          {/* Sport picker */}
+          <div className="flex gap-1.5 flex-wrap">
+            {SPORTS_OPTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSport(s)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sport === s ? "bg-red-600 text-white" : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          {/* Games */}
+          {loading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+              <Loader2 className="size-3 animate-spin" /> Loading odds…
+            </div>
+          ) : games.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">No {sport} games today.</p>
+          ) : (
+            <div className="space-y-2">
+              {games.map((g: any, i: number) => (
+                <div key={g.gameId ?? i} className="flex items-center justify-between text-xs border-b border-border pb-2 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{g.awayTeam} @ {g.homeTeam}</p>
+                    <p className="text-muted-foreground">{g.status === "Final" ? "Final" : g.status === "InProgress" ? "🔴 Live" : "Scheduled"}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-right shrink-0 ml-3">
+                    <div>
+                      <p className="text-muted-foreground">Spread</p>
+                      <p className="text-foreground">{g.spread != null ? (g.spread > 0 ? `+${g.spread}` : g.spread) : "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Total</p>
+                      <p className="text-foreground">{g.overUnder ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">ML</p>
+                      <p className="text-foreground">{fmtOddsNum(g.homeMoneyline)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
 
 interface Leg {
   sport: string;
@@ -319,6 +408,9 @@ export function AddBet() {
           onDiscard={() => setOcrResult(null)}
         />
       )}
+
+      {/* Live Odds Panel */}
+      <LiveOddsPanel />
 
       {/* Manual form */}
       <Card className="border-border bg-card">

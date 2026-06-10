@@ -1,7 +1,7 @@
-import { AccountSettings, useAuthedUser } from "../../apps/auth";
+import { SportsbookSettings } from "../../apps/sports/SportsbookSettings";
 
 export { Page };
 
 function Page() {
-  return <AccountSettings user={useAuthedUser()} />;
+  return <SportsbookSettings />;
 }

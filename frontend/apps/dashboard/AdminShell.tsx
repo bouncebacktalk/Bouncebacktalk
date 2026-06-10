@@ -10,6 +10,7 @@ const ROUTES: Record<string, { active: string; title: string }> = {
   "/dashboard": { active: "dashboard", title: "Dashboard" },
   "/add": { active: "add", title: "Add Bet" },
   "/history": { active: "history", title: "Bet History" },
+  "/odds": { active: "odds", title: "Live Odds" },
   "/leads": { active: "leads", title: "Leads" },
   "/members": { active: "members", title: "Members" },
   "/settings": { active: "settings", title: "Settings" },

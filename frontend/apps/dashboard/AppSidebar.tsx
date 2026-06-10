@@ -4,6 +4,7 @@ import {
   PlusCircle,
   History,
   Settings,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -34,6 +35,7 @@ const NAV: NavItem[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { key: "add", label: "Add Bet", icon: PlusCircle, href: "/add" },
   { key: "history", label: "Bet History", icon: History, href: "/history" },
+  { key: "odds", label: "Live Odds", icon: TrendingUp, href: "/odds" },
   { key: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
 
