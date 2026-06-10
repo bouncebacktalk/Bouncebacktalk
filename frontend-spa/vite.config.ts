@@ -17,6 +17,18 @@ export default defineConfig({
       protocol: 'wss',
       clientPort: 443,
     },
+    proxy: {
+      '/api/espn': {
+        target: 'https://site.api.espn.com',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/api\/espn/, ''),
+      },
+      '/api/mlb': {
+        target: 'https://statsapi.mlb.com',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/api\/mlb/, ''),
+      },
+    },
   },
   build: {
     outDir: 'dist',
