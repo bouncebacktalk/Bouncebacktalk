@@ -72,15 +72,45 @@ export class SportsDataService {
     return new Date().toISOString().slice(0, 10);
   }
 
-  /** Get today's games with odds for a given sport */
+  /** Get today's games with odds for a given sport.
+   *  If the odds endpoint is unauthorized (plan doesn't include it),
+   *  automatically falls back to the scores endpoint so games still appear. */
   async getOddsByDate(sport: string, date?: string): Promise<GameOdds[]> {
     const cfg = SPORT_CONFIG[sport.toUpperCase()];
     if (!cfg) return [];
     const d = date ?? this.today();
-    const url = `${BASE}/${cfg.league}/${cfg.oddsPath}/${d}?key=${API_KEY}`;
-    const raw = await this.fetch<any[]>(url);
-    if (!raw) return [];
-    return raw.map((g: any) => this.normalizeOdds(g, sport));
+
+    // Try odds endpoint first
+    const oddsUrl = `${BASE}/${cfg.league}/${cfg.oddsPath}/${d}?key=${API_KEY}`;
+    const oddsRaw = await this.fetch<any>(oddsUrl);
+
+    // If we got a valid array back, use it
+    if (Array.isArray(oddsRaw) && oddsRaw.length >= 0) {
+      return oddsRaw.map((g: any) => this.normalizeOdds(g, sport));
+    }
+
+    // Odds endpoint unauthorized or failed — fall back to scores
+    this.logger.warn(`Odds endpoint unavailable for ${sport}, falling back to scores`);
+    const scoresUrl = `${BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${API_KEY}`;
+    const scoresRaw = await this.fetch<any[]>(scoresUrl);
+    if (!Array.isArray(scoresRaw)) return [];
+
+    // Return games with null odds fields so the UI still renders them
+    return scoresRaw.map((g: any) => ({
+      gameId: String(g.GameId ?? g.ScoreId ?? g.GameKey ?? ''),
+      sport,
+      homeTeam: g.HomeTeam ?? g.HomeTeamName ?? '',
+      awayTeam: g.AwayTeam ?? g.AwayTeamName ?? '',
+      gameTime: g.DateTime ?? g.GameDateTime ?? g.Day ?? '',
+      status: g.Status ?? 'Scheduled',
+      homeScore: g.HomeScore ?? g.HomeTeamScore ?? null,
+      awayScore: g.AwayScore ?? g.AwayTeamScore ?? null,
+      spread: null,
+      overUnder: null,
+      homeMoneyline: null,
+      awayMoneyline: null,
+      sportsbooks: [],
+    }));
   }
 
   /** Get today's scores for a given sport */
