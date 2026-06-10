@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { Search, ChevronDown, Trash2, CheckCircle, XCircle, Minus } from "lucide-react";
+import { Search, ChevronDown, Trash2, CheckCircle, Activity } from "lucide-react";
+import { useLiveScores, matchLegToScore, type LiveScore } from "./useLiveScores";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,21 @@ function SettleDialog({
   );
 }
 
-function BetRow({ bet, onRefresh }: { bet: Bet; onRefresh: () => void }) {
+function ScoreBadge({ score }: { score: LiveScore }) {
+  const isLive = score.status === "InProgress";
+  const isFinal = score.status === "Final" || score.status === "F";
+  if (score.homeScore == null && score.awayScore == null) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${isLive ? "bg-green-500/15 text-green-400 border border-green-500/30" : "bg-muted text-muted-foreground"}`}>
+      {isLive && <span className="size-1.5 rounded-full bg-green-400 animate-pulse inline-block" />}
+      {score.awayTeam.split(" ").pop()} {score.awayScore ?? "–"} @ {score.homeTeam.split(" ").pop()} {score.homeScore ?? "–"}
+      {isLive && score.quarter && <span className="opacity-70"> Q{score.quarter}</span>}
+      {isFinal && <span className="opacity-70"> F</span>}
+    </span>
+  );
+}
+
+function BetRow({ bet, onRefresh, liveScores }: { bet: Bet; onRefresh: () => void; liveScores: LiveScore[] }) {
   const [expanded, setExpanded] = useState(false);
   const [settling, setSettling] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -174,34 +189,59 @@ function BetRow({ bet, onRefresh }: { bet: Bet; onRefresh: () => void }) {
 
         {expanded && (
           <div className="px-4 pb-4 space-y-3 bg-muted/20">
+            {/* Parlay progress bar */}
+            {bet.type === "PARLAY" && bet.status === "PENDING" && bet.legs.length > 0 && (() => {
+              const won = bet.legs.filter(l => l.result === "WON").length;
+              const lost = bet.legs.filter(l => l.result === "LOST").length;
+              const total = bet.legs.length;
+              if (won + lost === 0) return null;
+              return (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1"><Activity className="size-3" /> Parlay progress</span>
+                    <span>{won}/{total} legs hit{lost > 0 ? ` · ${lost} lost` : ""}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden flex">
+                    <div className="bg-green-500 h-full transition-all" style={{ width: `${(won / total) * 100}%` }} />
+                    <div className="bg-red-500 h-full transition-all" style={{ width: `${(lost / total) * 100}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Legs */}
             {bet.legs.length > 0 && (
               <div className="space-y-1">
-                {bet.legs.map((leg, i) => (
-                  <div
-                    key={leg.id}
-                    className="flex items-center gap-2 text-xs rounded bg-muted px-2.5 py-2"
-                  >
-                    <span className="text-muted-foreground w-4">{i + 1}.</span>
-                    <span className="font-medium text-foreground">{leg.pick ?? "—"}</span>
-                    {leg.line && <span className="text-muted-foreground">{leg.line}</span>}
-                    {leg.game && <span className="text-muted-foreground">· {leg.game}</span>}
-                    {leg.sport && <span className="text-muted-foreground">· {leg.sport}</span>}
-                    {leg.odds && (
-                      <span className="ml-auto font-mono">
-                        {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
-                      </span>
-                    )}
-                    {leg.result && (
-                      <Badge
-                        variant="outline"
-                        className={`ml-1 text-xs ${statusBg(leg.result as BetStatus)}`}
-                      >
-                        {leg.result}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                {bet.legs.map((leg, i) => {
+                  const score = bet.status === "PENDING" ? matchLegToScore(leg, liveScores) : null;
+                  return (
+                    <div
+                      key={leg.id}
+                      className="flex flex-col gap-1 text-xs rounded bg-muted px-2.5 py-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground w-4">{i + 1}.</span>
+                        <span className="font-medium text-foreground">{leg.pick ?? "—"}</span>
+                        {leg.line && <span className="text-muted-foreground">{leg.line}</span>}
+                        {leg.sport && <span className="text-muted-foreground">· {leg.sport}</span>}
+                        {leg.odds && (
+                          <span className="ml-auto font-mono">
+                            {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
+                          </span>
+                        )}
+                        {leg.result && (
+                          <Badge
+                            variant="outline"
+                            className={`ml-1 text-xs ${statusBg(leg.result as BetStatus)}`}
+                          >
+                            {leg.result}
+                          </Badge>
+                        )}
+                      </div>
+                      {score && <div className="pl-6"><ScoreBadge score={score} /></div>}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -241,6 +281,7 @@ function BetRow({ bet, onRefresh }: { bet: Bet; onRefresh: () => void }) {
 }
 
 export function BetHistory() {
+  const liveScores = useLiveScores(60_000);
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -373,7 +414,7 @@ export function BetHistory() {
           ) : (
             <>
               {bets.map((bet) => (
-                <BetRow key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} />
+                <BetRow key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveScores={liveScores} />
               ))}
               {hasMore && (
                 <div className="p-4 text-center border-t border-border">

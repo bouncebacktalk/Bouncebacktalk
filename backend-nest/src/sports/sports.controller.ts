@@ -27,6 +27,12 @@ export class SportsController {
     return this.sportsData.getScoresByDate(sport, date);
   }
 
+  /** GET /api/sports/live-scores — all sports in parallel, 60s cached */
+  @Get('live-scores')
+  getLiveScores() {
+    return this.sportsData.getAllScoresToday();
+  }
+
   /** POST /api/sports/grade — manual trigger */
   @Post('grade')
   gradeNow() {

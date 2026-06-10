@@ -237,6 +237,22 @@ export class SportsDataService {
     return results.filter((r) => r.games.length > 0);
   }
 
+  // Simple 60-second in-memory cache for live scores
+  private _liveScoresCache: { ts: number; data: GameScore[] } | null = null;
+
+  /** All sports live scores today — cached 60s */
+  async getAllScoresToday(): Promise<GameScore[]> {
+    const now = Date.now();
+    if (this._liveScoresCache && now - this._liveScoresCache.ts < 60_000) {
+      return this._liveScoresCache.data;
+    }
+    const sports = Object.keys(SCORES_CONFIG);
+    const results = await Promise.all(sports.map((s) => this.getScoresByDate(s)));
+    const data = results.flat();
+    this._liveScoresCache = { ts: now, data };
+    return data;
+  }
+
   /** Get a single game score by gameId */
   async getGameScore(sport: string, gameId: string): Promise<GameScore | null> {
     const scores = await this.getScoresByDate(sport);
