@@ -158,7 +158,12 @@ export function AddBet() {
       if ((result as any).error === 'NO_API_KEY') {
         setOcrError("OCR is not configured yet (no API key). Fill in the form manually below.");
       } else if ((result as any).error) {
-        setOcrError("Couldn't parse this screenshot. Try a clearer image or fill in manually.");
+        const code = (result as any).error;
+        if (code === 'HTTP_401') {
+          setOcrError("Session expired — please log out and log back in, then try again.");
+        } else {
+          setOcrError(`Couldn't parse this screenshot (${code}). Try a clearer image or fill in manually.`);
+        }
       } else if (!result.stake && !result.odds && (!result.legs || result.legs.length === 0)) {
         setOcrError("Couldn't find bet details in this image. Fill in the form manually below.");
       } else {

@@ -66,6 +66,7 @@ Rules:
 - For a PARLAY, include ALL legs shown
 - payout = total you receive if you win (stake + profit)
 - If odds shown as decimal (e.g. 2.50), convert to American: (decimal - 1) * 100 if >= 2.0, or -100 / (decimal - 1) if < 2.0
+- IMPORTANT: In JSON, never write +12725. Write positive numbers without the + sign: 12725 not +12725
 - If a value truly cannot be found, use null
 - picks like "Lakers -5.5", "Over 224.5", "LeBron James anytime scorer" are all valid picks
 - Always include the team/player name in the pick field`,
@@ -93,7 +94,12 @@ Rules:
       const raw = data.choices?.[0]?.message?.content ?? '';
 
       // Strip markdown code fences if present
-      const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+      // Also strip leading + on numbers — GPT-4o writes +12725 which is invalid JSON
+      const clean = raw
+        .replace(/```(?:json)?\n?/g, '')
+        .replace(/```/g, '')
+        .replace(/:\s*\+(\d)/g, ': $1')   // "odds": +12725  →  "odds": 12725
+        .trim();
       const parsed = JSON.parse(clean);
 
       // Normalize: ensure legs is always an array
