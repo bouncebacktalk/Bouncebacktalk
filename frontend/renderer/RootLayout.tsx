@@ -6,7 +6,7 @@ import { ProfileShell } from "@/apps/dashboard/ProfileShell";
 // Routes that live inside the admin console shell (sidebar). Everything else
 // (landing, /login, /register) renders its own chrome; /profile gets the
 // standalone member shell.
-const ADMIN_PREFIXES = ["/dashboard", "/leads", "/members", "/settings"];
+const ADMIN_PREFIXES = ["/dashboard", "/leads", "/members", "/settings", "/add", "/history"];
 
 function isAdminRoute(pathname: string): boolean {
   return ADMIN_PREFIXES.some(

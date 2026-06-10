@@ -6,6 +6,7 @@ import { RequestIdMiddleware } from "./common/request-id.middleware";
 import { ConfigModule } from "./config";
 import { EmailModule } from "./email";
 import { HealthController } from "./health.controller";
+import { BetsModule } from "./bets/bets.module";
 import { LeadsModule } from "./leads";
 import { LoggerModule } from "./logger";
 import { PrismaModule } from "./prisma";

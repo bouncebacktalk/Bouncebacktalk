@@ -8,6 +8,8 @@ import { LoadingScreen, SignedOutScreen } from "./GateScreen";
 // persistent shell updates these on client navigation without remounting.
 const ROUTES: Record<string, { active: string; title: string }> = {
   "/dashboard": { active: "dashboard", title: "Dashboard" },
+  "/add": { active: "add", title: "Add Bet" },
+  "/history": { active: "history", title: "Bet History" },
   "/leads": { active: "leads", title: "Leads" },
   "/members": { active: "members", title: "Members" },
   "/settings": { active: "settings", title: "Settings" },

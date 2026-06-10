@@ -1,9 +1,9 @@
 import {
-  Inbox,
   LayoutDashboard,
   LogOut,
+  PlusCircle,
+  History,
   Settings,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -31,14 +31,9 @@ interface NavItem {
 // pages/<name>/+Page.tsx to grow the app. The whole shell is admin-only;
 // regular members get the standalone /profile page instead.
 const NAV: NavItem[] = [
-  {
-    key: "dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    href: "/dashboard",
-  },
-  { key: "leads", label: "Leads", icon: Inbox, href: "/leads" },
-  { key: "members", label: "Members", icon: Users, href: "/members" },
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { key: "add", label: "Add Bet", icon: PlusCircle, href: "/add" },
+  { key: "history", label: "Bet History", icon: History, href: "/history" },
   { key: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
 

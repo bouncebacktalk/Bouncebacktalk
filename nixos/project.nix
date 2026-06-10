@@ -22,7 +22,7 @@
     services = {
       frontend.enable = true;
       backend.enable = true;
-      spaMode = true;
+      spaMode = false;
       mode = "dev";
     };
 
