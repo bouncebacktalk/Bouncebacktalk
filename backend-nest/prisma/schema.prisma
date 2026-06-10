@@ -36,6 +36,7 @@ model User {
 
   refreshTokens  RefreshToken[]
   passwordResets PasswordReset[]
+  bets           Bet[]
 
   @@map("users")
 }
@@ -70,6 +71,60 @@ model PasswordReset {
 
   @@index([userId])
   @@map("password_resets")
+}
+
+// ─── Bet Tracker ─────────────────────────────────────────────────────────────
+
+enum BetStatus {
+  PENDING
+  WON
+  LOST
+  PUSH
+  VOID
+}
+
+enum BetType {
+  STRAIGHT
+  PARLAY
+}
+
+model Bet {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          BetType
+  status        BetStatus @default(PENDING)
+  sportsbook    String?
+  stake         Decimal   @db.Decimal(10, 2)
+  odds          Int       // American odds e.g. -110, +150
+  payout        Decimal   @db.Decimal(10, 2)
+  profit        Decimal?  @db.Decimal(10, 2)
+  notes         String?
+  screenshotUrl String?
+  betDate       DateTime  @default(now())
+  settledAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  legs          BetLeg[]
+
+  @@index([userId, betDate])
+  @@map("bets")
+}
+
+model BetLeg {
+  id       Int        @id @default(autoincrement())
+  betId    Int
+  bet      Bet        @relation(fields: [betId], references: [id], onDelete: Cascade)
+  sport    String?
+  league   String?
+  game     String?
+  betType  String?    // spread | moneyline | over | under | prop
+  pick     String?
+  line     String?
+  odds     Int?
+  result   BetStatus?
+
+  @@map("bet_legs")
 }
 
 // ─── Contact and CRM ─────────────────────────────────────────────────────────
