@@ -1,18 +1,40 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-const API_KEY = process.env.SPORTSDATA_API_KEY ?? '';
-const BASE = 'https://api.sportsdata.io/v3';
+const SPORTSDATA_KEY = process.env.SPORTSDATA_API_KEY ?? '';
+const ODDS_API_KEY   = process.env.ODDS_API_KEY ?? '';
+const SPORTSDATA_BASE = 'https://api.sportsdata.io/v3';
+const ODDS_API_BASE   = 'https://api.the-odds-api.com/v4';
+
+// The Odds API sport keys
+const ODDS_API_SPORT: Record<string, string> = {
+  NBA:   'basketball_nba',
+  NFL:   'americanfootball_nfl',
+  MLB:   'baseball_mlb',
+  NHL:   'icehockey_nhl',
+  NCAAF: 'americanfootball_ncaaf',
+  NCAAB: 'basketball_ncaab',
+};
+
+// SportsData.io scores endpoints (still used for grading)
+const SCORES_CONFIG: Record<string, { league: string; scoresPath: string }> = {
+  NBA:   { league: 'nba', scoresPath: 'scores/json/GamesByDate' },
+  NFL:   { league: 'nfl', scoresPath: 'scores/json/ScoresByDate' },
+  MLB:   { league: 'mlb', scoresPath: 'scores/json/GamesByDate' },
+  NHL:   { league: 'nhl', scoresPath: 'scores/json/GamesByDate' },
+  NCAAF: { league: 'cfb', scoresPath: 'scores/json/GamesByDate' },
+  NCAAB: { league: 'cbb', scoresPath: 'scores/json/GamesByDate' },
+};
 
 export interface GameOdds {
   gameId: string;
   sport: string;
   homeTeam: string;
   awayTeam: string;
-  gameTime: string;          // ISO string
-  status: string;            // 'Scheduled' | 'InProgress' | 'Final'
+  gameTime: string;
+  status: string;
   homeScore: number | null;
   awayScore: number | null;
-  spread: number | null;     // home spread e.g. -5.5
+  spread: number | null;
   overUnder: number | null;
   homeMoneyline: number | null;
   awayMoneyline: number | null;
@@ -40,16 +62,6 @@ export interface GameScore {
   gameTime: string;
 }
 
-// Map our sport keys to SportsData.io endpoints
-const SPORT_CONFIG: Record<string, { league: string; scoresPath: string; oddsPath: string }> = {
-  NBA:  { league: 'nba',    scoresPath: 'scores/json/GamesByDate',    oddsPath: 'odds/json/GameOddsByDate' },
-  NFL:  { league: 'nfl',    scoresPath: 'scores/json/ScoresByDate',   oddsPath: 'odds/json/GameOddsByDate' },
-  MLB:  { league: 'mlb',    scoresPath: 'scores/json/GamesByDate',    oddsPath: 'odds/json/GameOddsByDate' },
-  NHL:  { league: 'nhl',    scoresPath: 'scores/json/GamesByDate',    oddsPath: 'odds/json/GameOddsByDate' },
-  NCAAF:{ league: 'cfb',    scoresPath: 'scores/json/GamesByDate',    oddsPath: 'odds/json/GameOddsByDate' },
-  NCAAB:{ league: 'cbb',    scoresPath: 'scores/json/GamesByDate',    oddsPath: 'odds/json/GameOddsByDate' },
-};
-
 @Injectable()
 export class SportsDataService {
   private readonly logger = new Logger(SportsDataService.name);
@@ -58,12 +70,12 @@ export class SportsDataService {
     try {
       const res = await globalThis.fetch(url);
       if (!res.ok) {
-        this.logger.warn(`SportsData API ${res.status} for ${url}`);
+        this.logger.warn(`API ${res.status} for ${url}`);
         return null;
       }
       return await res.json() as T;
     } catch (err: any) {
-      this.logger.error(`SportsData fetch error: ${err?.message}`);
+      this.logger.error(`Fetch error: ${err?.message}`);
       return null;
     }
   }
@@ -72,39 +84,44 @@ export class SportsDataService {
     return new Date().toISOString().slice(0, 10);
   }
 
-  /** Get today's games with odds for a given sport.
-   *  If the odds endpoint is unauthorized (plan doesn't include it),
-   *  automatically falls back to the scores endpoint so games still appear. */
-  async getOddsByDate(sport: string, date?: string): Promise<GameOdds[]> {
-    const cfg = SPORT_CONFIG[sport.toUpperCase()];
-    if (!cfg) return [];
-    const d = date ?? this.today();
+  /** Get today's odds from The Odds API */
+  async getOddsByDate(sport: string, _date?: string): Promise<GameOdds[]> {
+    const sportKey = ODDS_API_SPORT[sport.toUpperCase()];
+    if (!sportKey) return [];
 
-    // Try odds endpoint first
-    const oddsUrl = `${BASE}/${cfg.league}/${cfg.oddsPath}/${d}?key=${API_KEY}`;
-    const oddsRaw = await this.fetch<any>(oddsUrl);
+    const url = `${ODDS_API_BASE}/sports/${sportKey}/odds?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`;
+    const raw = await this.fetch<any[]>(url);
 
-    // If we got a valid array back, use it
-    if (Array.isArray(oddsRaw) && oddsRaw.length >= 0) {
-      return oddsRaw.map((g: any) => this.normalizeOdds(g, sport));
+    if (!Array.isArray(raw)) {
+      this.logger.warn(`The Odds API returned non-array for ${sport}, falling back to scores`);
+      return this.getScoresFallback(sport);
     }
 
-    // Odds endpoint unauthorized or failed — fall back to scores
-    this.logger.warn(`Odds endpoint unavailable for ${sport}, falling back to scores`);
-    const scoresUrl = `${BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${API_KEY}`;
-    const scoresRaw = await this.fetch<any[]>(scoresUrl);
-    if (!Array.isArray(scoresRaw)) return [];
+    if (raw.length === 0) {
+      // No upcoming games from odds API — try scores for today's results
+      return this.getScoresFallback(sport);
+    }
 
-    // Return games with null odds fields so the UI still renders them
-    return scoresRaw.map((g: any) => ({
+    return raw.map((g: any) => this.normalizeOddsApiGame(g, sport));
+  }
+
+  /** Fallback: scores only (no lines) */
+  private async getScoresFallback(sport: string): Promise<GameOdds[]> {
+    const cfg = SCORES_CONFIG[sport.toUpperCase()];
+    if (!cfg) return [];
+    const d = this.today();
+    const url = `${SPORTSDATA_BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${SPORTSDATA_KEY}`;
+    const raw = await this.fetch<any[]>(url);
+    if (!Array.isArray(raw)) return [];
+    return raw.map((g: any) => ({
       gameId: String(g.GameId ?? g.ScoreId ?? g.GameKey ?? ''),
       sport,
-      homeTeam: g.HomeTeam ?? g.HomeTeamName ?? '',
-      awayTeam: g.AwayTeam ?? g.AwayTeamName ?? '',
+      homeTeam: g.HomeTeam ?? '',
+      awayTeam: g.AwayTeam ?? '',
       gameTime: g.DateTime ?? g.GameDateTime ?? g.Day ?? '',
       status: g.Status ?? 'Scheduled',
-      homeScore: g.HomeScore ?? g.HomeTeamScore ?? null,
-      awayScore: g.AwayScore ?? g.AwayTeamScore ?? null,
+      homeScore: g.HomeScore ?? null,
+      awayScore: g.AwayScore ?? null,
       spread: null,
       overUnder: null,
       homeMoneyline: null,
@@ -113,92 +130,86 @@ export class SportsDataService {
     }));
   }
 
-  /** Get today's scores for a given sport */
-  async getScoresByDate(sport: string, date?: string): Promise<GameScore[]> {
-    const cfg = SPORT_CONFIG[sport.toUpperCase()];
-    if (!cfg) return [];
-    const d = date ?? this.today();
-    const url = `${BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${API_KEY}`;
-    const raw = await this.fetch<any[]>(url);
-    if (!raw) return [];
-    return raw.map((g: any) => this.normalizeScore(g, sport));
-  }
-
-  /** Get all active sports today */
-  async getAllOddsToday(): Promise<{ sport: string; games: GameOdds[] }[]> {
-    const sports = Object.keys(SPORT_CONFIG);
-    const results = await Promise.all(
-      sports.map(async (sport) => ({
-        sport,
-        games: await this.getOddsByDate(sport),
-      }))
-    );
-    return results.filter((r) => r.games.length > 0);
-  }
-
-  /** Get a single game's current score by gameId and sport */
-  async getGameScore(sport: string, gameId: string): Promise<GameScore | null> {
-    const scores = await this.getScoresByDate(sport);
-    return scores.find((s) => s.gameId === gameId) ?? null;
-  }
-
-  private normalizeOdds(g: any, sport: string): GameOdds {
-    // Collect sportsbook lines
+  private normalizeOddsApiGame(g: any, sport: string): GameOdds {
     const sportsbooks: SportsbookLine[] = [];
-    const sbookMap: Record<string, SportsbookLine> = {};
+    let spread: number | null = null;
+    let overUnder: number | null = null;
+    let homeMoneyline: number | null = null;
+    let awayMoneyline: number | null = null;
 
-    const pushLineItem = (item: any) => {
-      const name = item.SportsbookId || item.Sportsbook || 'Unknown';
-      if (!sbookMap[name]) {
-        sbookMap[name] = { sportsbook: name, spread: null, overUnder: null, homeMoneyline: null, awayMoneyline: null };
+    // Priority order for consensus line
+    const PRIORITY = ['draftkings', 'fanduel', 'betmgm', 'caesars', 'espnbet', 'betonlineag'];
+
+    for (const bm of (g.bookmakers ?? [])) {
+      const sbName = bm.title ?? bm.key ?? '';
+      let sbSpread: number | null = null;
+      let sbTotal: number | null = null;
+      let sbHomeMl: number | null = null;
+      let sbAwayMl: number | null = null;
+
+      for (const market of (bm.markets ?? [])) {
+        if (market.key === 'h2h') {
+          for (const outcome of (market.outcomes ?? [])) {
+            if (outcome.name === g.home_team) sbHomeMl = outcome.price;
+            else sbAwayMl = outcome.price;
+          }
+        } else if (market.key === 'spreads') {
+          for (const outcome of (market.outcomes ?? [])) {
+            if (outcome.name === g.home_team) sbSpread = outcome.point;
+          }
+        } else if (market.key === 'totals') {
+          if (market.outcomes?.[0]) sbTotal = market.outcomes[0].point;
+        }
       }
-      const e = sbookMap[name];
-      if (item.PregameOdds) {
-        item.PregameOdds.forEach((o: any) => {
-          if (o.HomePointSpread != null) e.spread = o.HomePointSpread;
-          if (o.OverUnder != null) e.overUnder = o.OverUnder;
-          if (o.HomeMoneyLine != null) e.homeMoneyline = o.HomeMoneyLine;
-          if (o.AwayMoneyLine != null) e.awayMoneyline = o.AwayMoneyLine;
-        });
+
+      sportsbooks.push({ sportsbook: sbName, spread: sbSpread, overUnder: sbTotal, homeMoneyline: sbHomeMl, awayMoneyline: sbAwayMl });
+
+      // Use first priority book for consensus
+      if (homeMoneyline == null && PRIORITY.includes(bm.key)) {
+        spread = sbSpread;
+        overUnder = sbTotal;
+        homeMoneyline = sbHomeMl;
+        awayMoneyline = sbAwayMl;
       }
-      // flat fields
-      if (item.HomePointSpread != null) e.spread = item.HomePointSpread;
-      if (item.OverUnder != null) e.overUnder = item.OverUnder;
-      if (item.HomeMoneyLine != null) e.homeMoneyline = item.HomeMoneyLine;
-      if (item.AwayMoneyLine != null) e.awayMoneyline = item.AwayMoneyLine;
-    };
-
-    if (Array.isArray(g.PregameOddsByAvailableSportsbook)) {
-      g.PregameOddsByAvailableSportsbook.forEach(pushLineItem);
-    }
-    if (Array.isArray(g.SportsbookOdds)) {
-      g.SportsbookOdds.forEach(pushLineItem);
     }
 
-    Object.values(sbookMap).forEach((s) => sportsbooks.push(s));
+    // Fallback: first bookmaker
+    if (homeMoneyline == null && sportsbooks.length > 0) {
+      const first = sportsbooks[0];
+      spread = first.spread;
+      overUnder = first.overUnder;
+      homeMoneyline = first.homeMoneyline;
+      awayMoneyline = first.awayMoneyline;
+    }
 
-    // Consensus line fallback
-    const consensus = sportsbooks[0] ?? {};
+    const isLive = g.commence_time && new Date(g.commence_time) < new Date();
 
     return {
-      gameId: String(g.GameId ?? g.ScoreId ?? g.GameKey ?? ''),
+      gameId: g.id ?? '',
       sport,
-      homeTeam: g.HomeTeam ?? g.HomeTeamName ?? '',
-      awayTeam: g.AwayTeam ?? g.AwayTeamName ?? '',
-      gameTime: g.DateTime ?? g.GameDateTime ?? g.Day ?? '',
-      status: g.Status ?? 'Scheduled',
-      homeScore: g.HomeScore ?? g.HomeTeamScore ?? null,
-      awayScore: g.AwayScore ?? g.AwayTeamScore ?? null,
-      spread: g.PointSpread ?? consensus.spread ?? null,
-      overUnder: g.OverUnder ?? consensus.overUnder ?? null,
-      homeMoneyline: g.HomeMoneyLine ?? consensus.homeMoneyline ?? null,
-      awayMoneyline: g.AwayMoneyLine ?? consensus.awayMoneyline ?? null,
+      homeTeam: g.home_team ?? '',
+      awayTeam: g.away_team ?? '',
+      gameTime: g.commence_time ?? '',
+      status: isLive ? 'InProgress' : 'Scheduled',
+      homeScore: null,
+      awayScore: null,
+      spread,
+      overUnder,
+      homeMoneyline,
+      awayMoneyline,
       sportsbooks,
     };
   }
 
-  private normalizeScore(g: any, sport: string): GameScore {
-    return {
+  /** Get today's scores for grading */
+  async getScoresByDate(sport: string, date?: string): Promise<GameScore[]> {
+    const cfg = SCORES_CONFIG[sport.toUpperCase()];
+    if (!cfg) return [];
+    const d = date ?? this.today();
+    const url = `${SPORTSDATA_BASE}/${cfg.league}/${cfg.scoresPath}/${d}?key=${SPORTSDATA_KEY}`;
+    const raw = await this.fetch<any[]>(url);
+    if (!Array.isArray(raw)) return [];
+    return raw.map((g: any) => ({
       gameId: String(g.GameId ?? g.ScoreId ?? g.GameKey ?? ''),
       sport,
       homeTeam: g.HomeTeam ?? g.HomeTeamName ?? '',
@@ -211,6 +222,24 @@ export class SportsDataService {
         ? `${g.TimeRemainingMinutes}:${String(g.TimeRemainingSeconds ?? 0).padStart(2, '0')}`
         : null,
       gameTime: g.DateTime ?? g.GameDateTime ?? g.Day ?? '',
-    };
+    }));
+  }
+
+  /** Get all active sports today */
+  async getAllOddsToday(): Promise<{ sport: string; games: GameOdds[] }[]> {
+    const sports = Object.keys(ODDS_API_SPORT);
+    const results = await Promise.all(
+      sports.map(async (sport) => ({
+        sport,
+        games: await this.getOddsByDate(sport),
+      }))
+    );
+    return results.filter((r) => r.games.length > 0);
+  }
+
+  /** Get a single game score by gameId */
+  async getGameScore(sport: string, gameId: string): Promise<GameScore | null> {
+    const scores = await this.getScoresByDate(sport);
+    return scores.find((s) => s.gameId === gameId) ?? null;
   }
 }
