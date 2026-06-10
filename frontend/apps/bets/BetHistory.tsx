@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { Search, ChevronDown, Trash2, CheckCircle, Activity } from "lucide-react";
-import { useLiveScores, matchLegToScore, type LiveScore } from "./useLiveScores";
+import { Search, ChevronDown, Trash2, CheckCircle, Activity, TrendingUp, TrendingDown, Minus as MinusIcon } from "lucide-react";
+import { useLiveScores, matchLegToScore, computeLegStatus, type LiveScore, type LegStatus } from "./useLiveScores";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,18 +103,62 @@ function SettleDialog({
   );
 }
 
-function ScoreBadge({ score }: { score: LiveScore }) {
-  const isLive = score.status === "InProgress";
-  const isFinal = score.status === "Final" || score.status === "F";
-  if (score.homeScore == null && score.awayScore == null) return null;
+// ── Supported sports for live tracking ───────────────────────────────────────
+const LIVE_SPORTS = new Set(["NBA", "MLB"]);
+const COMING_SOON_SPORTS = new Set(["NFL", "NHL", "NCAAF", "NCAAB"]);
+
+function ComingSoonBadge({ sport }: { sport?: string }) {
+  if (!sport) return null;
+  const upper = sport.toUpperCase();
+  if (!COMING_SOON_SPORTS.has(upper)) return null;
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${isLive ? "bg-green-500/15 text-green-400 border border-green-500/30" : "bg-muted text-muted-foreground"}`}>
-      {isLive && <span className="size-1.5 rounded-full bg-green-400 animate-pulse inline-block" />}
-      {score.awayTeam.split(" ").pop()} {score.awayScore ?? "–"} @ {score.homeTeam.split(" ").pop()} {score.homeScore ?? "–"}
-      {isLive && score.quarter && <span className="opacity-70"> Q{score.quarter}</span>}
-      {isFinal && <span className="opacity-70"> F</span>}
+    <span className="inline-flex items-center text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      {upper} live tracking coming soon
     </span>
   );
+}
+
+function ScoreBadge({ score, legStatus }: { score: LiveScore; legStatus?: LegStatus }) {
+  if (score.homeScore == null && score.awayScore == null) return null;
+
+  const awayNick = score.awayTeam.split(" ").pop() ?? score.awayTeamCode;
+  const homeNick = score.homeTeam.split(" ").pop() ?? score.homeTeamCode;
+
+  // Period label: "Q3 4:32", "OT", "Top 4th", "Final", etc.
+  let periodText = "";
+  if (score.isFinal) {
+    periodText = " · F";
+  } else if (score.isLive && score.periodLabel) {
+    periodText = ` · ${score.periodLabel}`;
+    if (score.timeRemaining) periodText += ` ${score.timeRemaining}`;
+  }
+
+  const statusColors: Record<NonNullable<LegStatus>, string> = {
+    winning: "bg-green-500/15 text-green-400 border-green-500/30",
+    losing:  "bg-red-500/15  text-red-400  border-red-500/30",
+    push:    "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  };
+
+  const baseClass = score.isLive
+    ? (legStatus ? statusColors[legStatus] : "bg-green-500/15 text-green-400 border-green-500/30")
+    : "bg-muted/60 text-muted-foreground border-border";
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${baseClass}`}>
+      {score.isLive && (
+        <span className={`size-1.5 rounded-full inline-block animate-pulse ${legStatus === "winning" ? "bg-green-400" : legStatus === "losing" ? "bg-red-400" : "bg-green-400"}`} />
+      )}
+      {awayNick} {score.awayScore} @ {homeNick} {score.homeScore}
+      <span className="opacity-60">{periodText}</span>
+    </span>
+  );
+}
+
+function LegStatusIcon({ status }: { status: LegStatus }) {
+  if (!status) return null;
+  if (status === "winning") return <TrendingUp className="size-3 text-green-400 shrink-0" />;
+  if (status === "losing")  return <TrendingDown className="size-3 text-red-400 shrink-0" />;
+  return <MinusIcon className="size-3 text-yellow-400 shrink-0" />;
 }
 
 function BetRow({ bet, onRefresh, liveScores }: { bet: Bet; onRefresh: () => void; liveScores: LiveScore[] }) {
@@ -213,32 +257,78 @@ function BetRow({ bet, onRefresh, liveScores }: { bet: Bet; onRefresh: () => voi
             {bet.legs.length > 0 && (
               <div className="space-y-1">
                 {bet.legs.map((leg, i) => {
-                  const score = bet.status === "PENDING" ? matchLegToScore(leg, liveScores) : null;
+                  const isPending = bet.status === "PENDING";
+                  const score = isPending ? matchLegToScore(leg, liveScores) : null;
+                  const legStatus = score ? computeLegStatus(leg, score) : null;
+                  const isLiveGame = score?.isLive ?? false;
+                  const sportUpper = (leg.sport ?? "").toUpperCase();
+                  const unsupported = COMING_SOON_SPORTS.has(sportUpper);
+
                   return (
                     <div
                       key={leg.id}
-                      className="flex flex-col gap-1 text-xs rounded bg-muted px-2.5 py-2"
+                      className={`flex flex-col gap-1 text-xs rounded px-2.5 py-2 border transition-colors ${
+                        isLiveGame && legStatus === "winning"
+                          ? "bg-green-500/5 border-green-500/20"
+                          : isLiveGame && legStatus === "losing"
+                          ? "bg-red-500/5 border-red-500/20"
+                          : "bg-muted border-transparent"
+                      }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground w-4">{i + 1}.</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-muted-foreground w-4 shrink-0">{i + 1}.</span>
                         <span className="font-medium text-foreground">{leg.pick ?? "—"}</span>
                         {leg.line && <span className="text-muted-foreground">{leg.line}</span>}
-                        {leg.sport && <span className="text-muted-foreground">· {leg.sport}</span>}
-                        {leg.odds && (
-                          <span className="ml-auto font-mono">
-                            {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
+                        {leg.sport && (
+                          <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                            {leg.sport}
                           </span>
                         )}
-                        {leg.result && (
-                          <Badge
-                            variant="outline"
-                            className={`ml-1 text-xs ${statusBg(leg.result as BetStatus)}`}
-                          >
-                            {leg.result}
-                          </Badge>
-                        )}
+
+                        <div className="ml-auto flex items-center gap-1.5">
+                          {/* Live win/loss icon */}
+                          {isLiveGame && isPending && <LegStatusIcon status={legStatus} />}
+
+                          {leg.odds && (
+                            <span className="font-mono text-muted-foreground">
+                              {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
+                            </span>
+                          )}
+                          {leg.result && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${statusBg(leg.result as BetStatus)}`}
+                            >
+                              {leg.result}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      {score && <div className="pl-6"><ScoreBadge score={score} /></div>}
+
+                      {/* Live score row */}
+                      {score && (
+                        <div className="pl-6 flex items-center gap-2 flex-wrap">
+                          <ScoreBadge score={score} legStatus={legStatus} />
+                          {isLiveGame && legStatus && (
+                            <span className={`text-[10px] font-semibold ${
+                              legStatus === "winning" ? "text-green-400" :
+                              legStatus === "losing"  ? "text-red-400"   :
+                              "text-yellow-400"
+                            }`}>
+                              {legStatus === "winning" ? "▲ Winning" :
+                               legStatus === "losing"  ? "▼ Losing"  :
+                               "= Push"}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Coming soon notice for unsupported sports */}
+                      {isPending && unsupported && (
+                        <div className="pl-6">
+                          <ComingSoonBadge sport={leg.sport} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
