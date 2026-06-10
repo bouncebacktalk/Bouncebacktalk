@@ -1,4 +1,4 @@
-import { apiRequest } from '../api';
+import { apiRequest, currentAccessToken } from '../api';
 
 export type BetStatus = 'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID';
 export type BetType = 'STRAIGHT' | 'PARLAY';
@@ -100,11 +100,19 @@ export const betsApi = {
   ocr: async (file: File): Promise<OcrResult> => {
     const form = new FormData();
     form.append('file', file);
+    const token = currentAccessToken();
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch('/api/bets/ocr', {
       method: 'POST',
+      credentials: 'include',
+      headers,
       body: form,
     });
-    if (!res.ok) throw new Error('OCR failed');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { error: `HTTP_${res.status}`, ...body } as any;
+    }
     return res.json();
   },
 };
