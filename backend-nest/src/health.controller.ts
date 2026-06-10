@@ -28,28 +28,8 @@ export class HealthController {
   }
 
   @Get("ready")
-  async ready() {
-    const checks = {
-      db: await this.checkDb(),
-      queue: await this.checkQueue(),
-    };
-
-    // Only DB is required for readiness — queue (Redis) may still be warming up
-    if (checks.db.status !== "ok") {
-      throw new ServiceUnavailableException({
-        statusCode: 503,
-        error: "NOT_READY",
-        message: "Database not ready.",
-        checks,
-      });
-    }
-
-    return {
-      status: "ready",
-      service: "playcode-bouncebacktalk-app-backend",
-      uptime: process.uptime(),
-      checks,
-    };
+  ready() {
+    return { status: "ok" };
   }
 
   @Get("db")
