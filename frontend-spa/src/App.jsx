@@ -1230,13 +1230,19 @@ const ScoresPage = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [mlbProbables, setMlbProbables] = useState({});
   const [showLineups, setShowLineups] = useState({});
+  const [fetchError, setFetchError] = useState(null);
 
   const load = () => {
     fetchScores().then(g => {
       setGames(g);
       setLastUpdated(new Date());
       setLoading(false);
-    }).catch(() => setLoading(false));
+      setFetchError(null);
+    }).catch(err => {
+      console.error('fetchScores error:', err);
+      setFetchError(String(err));
+      setLoading(false);
+    });
   };
 
   useEffect(() => {
@@ -1408,6 +1414,7 @@ const ScoresPage = () => {
           <div className="text-5xl mb-4">🏟️</div>
           <h2 className="text-xl font-black uppercase text-[#f0ebe0] mb-2">No Games Today</h2>
           <p className="text-[#555] text-sm">Check back later for live scores.</p>
+          {fetchError && <p className="text-[#E21111] text-xs mt-4 font-mono break-all px-4">{fetchError}</p>}
         </div>
       ) : (
         <>
