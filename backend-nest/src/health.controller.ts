@@ -33,15 +33,13 @@ export class HealthController {
       db: await this.checkDb(),
       queue: await this.checkQueue(),
     };
-    const failed = Object.values(checks).filter(
-      (check) => check.status !== "ok",
-    );
 
-    if (failed.length) {
+    // Only DB is required for readiness — queue (Redis) may still be warming up
+    if (checks.db.status !== "ok") {
       throw new ServiceUnavailableException({
         statusCode: 503,
         error: "NOT_READY",
-        message: "Service dependencies are not ready.",
+        message: "Database not ready.",
         checks,
       });
     }
