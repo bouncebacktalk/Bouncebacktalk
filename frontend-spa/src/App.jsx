@@ -588,18 +588,21 @@ const Hero = ({ games }) => {
             </div>
           </Link>
 
-          {/* Right sidebar — live scores */}
+          {/* Right sidebar — today's scores */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-[11px] font-black uppercase tracking-widest text-[#888] flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E21111] animate-pulse" /> Live Now
+                {games.some(g => g.isLive)
+                  ? <><span className="w-1.5 h-1.5 rounded-full bg-[#E21111] animate-pulse" /> Live Now</>
+                  : <><span className="w-1.5 h-1.5 rounded-full bg-[#555]" /> Today's Games</>
+                }
               </h2>
               <Link to="/scores" className="text-[10px] font-black uppercase tracking-widest text-[#E21111] hover:text-red-400">All Scores →</Link>
             </div>
-            {games.filter(g => g.isLive).length === 0 ? (
-              <div className="bg-[#1a1a1a] rounded-xl p-6 text-center text-[#555] text-sm">No live games right now</div>
+            {games.length === 0 ? (
+              <div className="bg-[#1a1a1a] rounded-xl p-6 text-center text-[#555] text-sm">Loading games...</div>
             ) : (
-              games.filter(g => g.isLive).slice(0, 6).map(g => (
+              [...games.filter(g => g.isLive), ...games.filter(g => !g.isLive && !g.isFinal), ...games.filter(g => g.isFinal)].slice(0, 6).map(g => (
                 <Link key={g.id} to={`/game/${g.league}/${g.id}`}
                   className="bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-xl p-3.5 transition-all group">
                   <div className="flex items-center justify-between mb-2">
