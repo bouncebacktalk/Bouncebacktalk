@@ -8,18 +8,24 @@ export class BetsService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: number, dto: CreateBetDto) {
+    const status: BetStatus = dto.status ?? 'PENDING';
+    const stake = Number(dto.stake);
+    const payout = Number(dto.payout);
+    const profit = this.calcProfit(status, stake, payout);
     return this.prisma.bet.create({
       data: {
         userId,
         type: dto.type,
+        status,
         sportsbook: dto.sportsbook,
         stake: dto.stake,
         odds: dto.odds,
         payout: dto.payout,
-        profit: null,
+        profit,
         notes: dto.notes,
         screenshotUrl: dto.screenshotUrl,
         betDate: dto.betDate ? new Date(dto.betDate) : new Date(),
+        settledAt: status !== 'PENDING' ? new Date(dto.betDate ?? Date.now()) : null,
         legs: dto.legs?.length
           ? { create: dto.legs.map(l => ({ ...l })) }
           : undefined,

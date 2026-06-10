@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { betsApi, type CreateBetPayload, type OcrResult } from "./bets";
+import { betsApi, type BetStatus, type CreateBetPayload, type OcrResult } from "./bets";
 
 const SPORTSBOOKS = [
   "DraftKings", "FanDuel", "BetMGM", "Caesars", "PointsBet",
