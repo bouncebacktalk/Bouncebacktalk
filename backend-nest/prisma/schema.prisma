@@ -34,9 +34,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  refreshTokens  RefreshToken[]
-  passwordResets PasswordReset[]
-  bets           Bet[]
+  refreshTokens        RefreshToken[]
+  passwordResets       PasswordReset[]
+  bets                 Bet[]
+  sportsbookPreference UserSportsbookPreference?
 
   @@map("users")
 }
@@ -125,6 +126,18 @@ model BetLeg {
   result   BetStatus?
 
   @@map("bet_legs")
+}
+
+// ─── Sportsbook Preferences ───────────────────────────────────────────────────
+
+model UserSportsbookPreference {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sportsbooks String[] // e.g. ["DraftKings", "FanDuel", "BetMGM"]
+  updatedAt  DateTime @updatedAt
+
+  @@map("user_sportsbook_preferences")
 }
 
 // ─── Contact and CRM ─────────────────────────────────────────────────────────
