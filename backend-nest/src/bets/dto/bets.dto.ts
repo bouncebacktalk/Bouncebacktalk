@@ -30,6 +30,7 @@ export class CreateBetDto {
   @IsNumber() @Min(0) payout!: number;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsString() screenshotUrl?: string;
+  @IsOptional() @IsEnum(BetStatus) status?: BetStatus;
   @IsOptional() @IsDateString() betDate?: string;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CreateBetLegDto)
   legs?: CreateBetLegDto[];
