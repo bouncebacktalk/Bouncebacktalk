@@ -150,9 +150,6 @@ in {
           NODE_ENV=${if isDev then "development" else "production"}
           PORT=${toString cfg.network.backendPort}
           PUBLIC_URL=http://localhost:${toString cfg.network.appPort}
-          POSTGRES_PASSWORD=1855fc58d876eded8fbe1cfc7ea6fdffdf57ad079165a852215ccb70a5d7d011
-          DATABASE_URL=postgresql://app:1855fc58d876eded8fbe1cfc7ea6fdffdf57ad079165a852215ccb70a5d7d011@127.0.0.1:5432/playcode-bouncebacktalk-app
-          REDIS_URL=redis://127.0.0.1:6379
           JWT_ACCESS_SECRET=7d080d87dc20324d1803421904bbc16249bb578f81dd712612ddeda085307d3193bcd6d96d6e461992760c82d974ec29ef42befd3cac1ff42258247506bf69ea
           JWT_REFRESH_SECRET=e8c8b0598b67db07171937d06a0af8e97cbb20772bb229ac7137555d2d76d839e121677dedc59f90191e7258b9c2fa3227c07840dad2400d87674d8dce2c54cb
           JWT_ACCESS_TTL=7d
