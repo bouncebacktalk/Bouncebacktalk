@@ -131,7 +131,7 @@ const localDateStr = () => {
 };
 
 const espnUrl = (sport, league, date) =>
-  `/api/espn/apis/site/v2/sports/${sport}/${league}/scoreboard?dates=${date || localDateStr()}`;
+  `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard?dates=${date || localDateStr()}`;
 
 const fetchScores = async () => {
   const today = localDateStr();
@@ -291,7 +291,7 @@ const fetchLeagueData = async (league) => {
   const sportPath = ESPN_SPORT_PATH[league];
   if (!sportPath) return { teams: [], standingGroups: [] };
 
-  const res = await fetch(`/api/espn/apis/v2/sports/${sportPath}/standings`);
+  const res = await fetch(`https://site.api.espn.com/apis/v2/sports/${sportPath}/standings`);
   const data = await res.json();
 
   const groups = [];
@@ -333,7 +333,7 @@ const fetchTeamRoster = async (league, teamId) => {
   if (!sportPath) return [];
   try {
     const res = await fetch(
-      `/api/espn/apis/site/v2/sports/${sportPath}/teams/${teamId}/roster`
+      `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/teams/${teamId}/roster`
     );
     const data = await res.json();
     // ESPN returns athletes as flat array OR grouped by position group ({items:[...]})
@@ -687,7 +687,7 @@ const fetchMLBProbables = async () => {
   const today = new Date().toISOString().slice(0, 10);
   try {
     const sched = await fetch(
-      `/api/mlb/api/v1/schedule?sportId=1&date=${today}&hydrate=probablePitcher,lineups`
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=probablePitcher,lineups`
     ).then(r => r.json());
 
     const games = sched.dates?.[0]?.games || [];
@@ -703,7 +703,7 @@ const fetchMLBProbables = async () => {
     const statsMap = {};
     await Promise.allSettled(
       [...pitcherIds].map(id =>
-        fetch(`/api/mlb/api/v1/people/${id}/stats?stats=season&season=2026&sportId=1`)
+        fetch(`https://statsapi.mlb.com/api/v1/people/${id}/stats?stats=season&season=2026&sportId=1`)
           .then(r => r.json())
           .then(d => {
             const s = d.stats?.[0]?.splits?.[0]?.stat;
@@ -778,7 +778,7 @@ const fetchBestBets = async () => {
 
   const results = await Promise.allSettled(
     LEAGUES.map(l =>
-      fetch(`/api/espn/apis/site/v2/sports/${l.sport}/${l.key}/scoreboard?dates=${todayStr}`)
+      fetch(`https://site.api.espn.com/apis/site/v2/sports/${l.sport}/${l.key}/scoreboard?dates=${todayStr}`)
         .then(r => r.json())
         .then(d => ({ league: l.key, events: d.events || [] }))
     )
@@ -999,7 +999,7 @@ const TrendingGames = () => {
       try {
         const results = await Promise.allSettled(
           TREND_SOURCES.map(s =>
-            fetch(`/api/espn/apis/site/v2/sports/${s.sport}/${s.slug}/news?limit=3`)
+            fetch(`https://site.api.espn.com/apis/site/v2/sports/${s.sport}/${s.slug}/news?limit=3`)
               .then(r => r.json())
               .then(d => (d.articles || []).slice(0, 3).map((a, idx) => ({
                 id: `${s.slug}-${idx}`,
@@ -2374,7 +2374,7 @@ const GamePreviewPage = () => {
   // ESPN summary — fetches odds (pickcenter) + play-by-play for a given ESPN event ID
   const fetchSummary = async (espnEventId, isLive) => {
     try {
-      const url = `/api/espn/apis/site/v2/sports/${leagueObj.sport}/${league}/summary?event=${espnEventId}`;
+      const url = `https://site.api.espn.com/apis/site/v2/sports/${leagueObj.sport}/${league}/summary?event=${espnEventId}`;
       const res = await fetch(url);
       const data = await res.json();
 
