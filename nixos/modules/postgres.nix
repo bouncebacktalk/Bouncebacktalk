@@ -69,7 +69,10 @@ in {
       serviceConfig = {
         Type = "oneshot";
         User = "postgres";
-        EnvironmentFile = "-${cfg.paths.workspace}/.env.local";
+        EnvironmentFile = [
+          "-${cfg.paths.configDir}/playcode-backend.env"
+          "-${cfg.paths.workspace}/.env.local"
+        ];
       };
       # Password comes from systemd's EnvironmentFile, not from Nix.
       script = ''
