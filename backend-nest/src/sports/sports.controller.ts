@@ -5,7 +5,6 @@ import { SportsDataService } from './sports-data.service';
 import { GradingService } from './grading.service';
 import { PreferencesService } from './preferences.service';
 
-@UseGuards(JwtAuthGuard)
 @Controller('sports')
 export class SportsController {
   constructor(
@@ -14,7 +13,21 @@ export class SportsController {
     private prefs: PreferencesService,
   ) {}
 
-  /** GET /api/sports/odds?sport=NBA&date=2026-06-10 */
+  // ── Public endpoints (no auth required) ────────────────────────────────────
+
+  /** GET /api/sports/live-scores — NBA + MLB live games, 60s cached */
+  @Get('live-scores')
+  getLiveScores(@Query('date') date?: string) {
+    return this.sportsData.getAllLiveGamesToday(date);
+  }
+
+  /** GET /api/sports/live-scores/status */
+  @Get('live-scores/status')
+  getLiveScoresStatus() {
+    return { supported: ['NBA', 'MLB'], comingSoon: ['NFL', 'NHL', 'NCAAF', 'NCAAB'] };
+  }
+
+  /** GET /api/sports/odds?sport=NBA */
   @Get('odds')
   getOdds(@Query('sport') sport: string, @Query('date') date?: string) {
     if (!sport || sport === 'ALL') return this.sportsData.getAllOddsToday();
@@ -27,46 +40,31 @@ export class SportsController {
     return this.sportsData.getScoresByDate(sport, date);
   }
 
-  /**
-   * GET /api/sports/live-scores
-   * Returns LiveGame[] for NBA + MLB (60s cached per sport).
-   * Optional ?date=YYYY-MM-DD to query a different date.
-   * NFL/NHL/NCAAB are not supported yet — use /api/sports/live-scores/status
-   * to check which sports are enabled.
-   */
-  @Get('live-scores')
-  getLiveScores(@Query('date') date?: string) {
-    return this.sportsData.getAllLiveGamesToday(date);
-  }
-
-  /** GET /api/sports/live-scores/status — which sports are supported */
-  @Get('live-scores/status')
-  getLiveScoresStatus() {
-    return {
-      supported: ['NBA', 'MLB'],
-      comingSoon: ['NFL', 'NHL', 'NCAAF', 'NCAAB'],
-    };
-  }
+  // ── Auth-required endpoints ────────────────────────────────────────────────
 
   /** POST /api/sports/grade — manual trigger */
+  @UseGuards(JwtAuthGuard)
   @Post('grade')
   gradeNow() {
     return this.grading.gradePendingBets();
   }
 
   /** GET /api/sports/preferences */
+  @UseGuards(JwtAuthGuard)
   @Get('preferences')
   getPreferences(@CurrentUser('id') userId: number) {
     return this.prefs.getSportsbooks(userId);
   }
 
   /** GET /api/sports/preferences/all */
+  @UseGuards(JwtAuthGuard)
   @Get('preferences/all')
   getAllSportsbooks() {
     return this.prefs.getAllSportsbooks();
   }
 
   /** POST /api/sports/preferences */
+  @UseGuards(JwtAuthGuard)
   @Post('preferences')
   setPreferences(
     @CurrentUser('id') userId: number,
