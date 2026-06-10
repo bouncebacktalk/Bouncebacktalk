@@ -160,6 +160,7 @@ in {
           MAIL_TRANSPORT=console
           MAIL_FROM="bouncebacktalk_app <noreply@bouncebacktalk.com>"
           OPENAI_API_KEY=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
+          REDIS_URL=redis://127.0.0.1:6379
           SPORTSDATA_API_KEY=cd48920d0d784a2199d1ceefa5183f6b
           SPORTSDATA_MLB_KEY=9c2775f1e543be5b47419cf6fbef851
           ODDS_API_KEY=3987a37833bfdb5954366c952b713632
