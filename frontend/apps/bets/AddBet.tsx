@@ -154,9 +154,18 @@ export function AddBet() {
     setOcrResult(null);
     try {
       const result = await betsApi.ocr(file);
-      setOcrResult(result);
+      // If the API key is missing, result will have error: 'NO_API_KEY'
+      if ((result as any).error === 'NO_API_KEY') {
+        setOcrError("OCR is not configured yet (no API key). Fill in the form manually below.");
+      } else if ((result as any).error) {
+        setOcrError("Couldn't parse this screenshot. Try a clearer image or fill in manually.");
+      } else if (!result.stake && !result.odds && (!result.legs || result.legs.length === 0)) {
+        setOcrError("Couldn't find bet details in this image. Fill in the form manually below.");
+      } else {
+        setOcrResult(result);
+      }
     } catch {
-      setOcrError("Couldn't read the screenshot. Fill in the form manually.");
+      setOcrError("Upload failed. Try again or fill in the form manually.");
     } finally {
       setOcrLoading(false);
       if (fileRef.current) fileRef.current.value = "";
