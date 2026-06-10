@@ -12,8 +12,9 @@ import type { User } from "@prisma/client";
  *   me(@CurrentUser() user: User) { return user }
  */
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): User => {
+  (data: keyof User | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
-    return request.user;
+    const user: User = request.user;
+    return data ? user?.[data] : user;
   },
 );
