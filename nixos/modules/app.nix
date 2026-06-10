@@ -158,10 +158,10 @@ in {
           AUTH_COOKIE_SAME_SITE=lax
           ADMIN_EMAILS=bouncebacktalk@gmail.com
           MAIL_TRANSPORT=console
-          MAIL_FROM=bouncebacktalk_app <noreply@bouncebacktalk.com>
+          MAIL_FROM="bouncebacktalk_app <noreply@bouncebacktalk.com>"
           OPENAI_API_KEY=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
           SPORTSDATA_API_KEY=cd48920d0d784a2199d1ceefa5183f6b
-          ODDS_API_KEY=4288240047090722
+          ODDS_API_KEY=3987a37833bfdb5954366c952b713632
         '';
       };
     })
