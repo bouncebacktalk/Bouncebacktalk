@@ -40,11 +40,15 @@ interface OcrPreviewProps {
   onDiscard: () => void;
 }
 
+const STATUS_OPTIONS: BetStatus[] = ["PENDING", "WON", "LOST", "PUSH", "VOID"];
+
 function OcrPreview({ result, onConfirm, onDiscard }: OcrPreviewProps) {
   const [sportsbook, setSportsbook] = useState(result.sportsbook ?? "");
   const [stake, setStake] = useState(String(result.stake ?? ""));
   const [odds, setOdds] = useState(String(result.odds ?? ""));
   const [payout, setPayout] = useState(String(result.payout ?? ""));
+  const [status, setStatus] = useState<BetStatus>(result.status ?? "PENDING");
+  const [betDate, setBetDate] = useState(result.betDate ?? new Date().toISOString().slice(0, 10));
 
   function handleConfirm() {
     onConfirm({
@@ -53,14 +57,19 @@ function OcrPreview({ result, onConfirm, onDiscard }: OcrPreviewProps) {
       stake: Number(stake),
       odds: Number(odds),
       payout: Number(payout),
+      status,
+      betDate,
       legs: result.legs?.map((l) => ({
         pick: l.pick,
         odds: l.odds,
         betType: l.betType,
         game: l.game,
+        result: l.result,
       })),
     });
   }
+
+  const statusColor = status === "WON" ? "text-green-400" : status === "LOST" ? "text-red-400" : status === "PUSH" ? "text-yellow-400" : "text-blue-400";
 
   return (
     <Card className="border-green-500/40 bg-green-500/5">
@@ -76,11 +85,30 @@ function OcrPreview({ result, onConfirm, onDiscard }: OcrPreviewProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div>
             <Label className="text-xs">Sportsbook</Label>
             <Input value={sportsbook} onChange={(e) => setSportsbook(e.target.value)} className="mt-1 h-8 text-sm" />
           </div>
+          <div>
+            <Label className="text-xs">Bet Date</Label>
+            <Input type="date" value={betDate} onChange={(e) => setBetDate(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs">Status</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
+              <SelectTrigger className={`mt-1 h-8 text-sm font-semibold ${statusColor}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <Label className="text-xs">Stake ($)</Label>
             <Input type="number" value={stake} onChange={(e) => setStake(e.target.value)} className="mt-1 h-8 text-sm" />
@@ -96,13 +124,17 @@ function OcrPreview({ result, onConfirm, onDiscard }: OcrPreviewProps) {
         </div>
         {result.legs && result.legs.length > 0 && (
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Detected legs</Label>
+            <Label className="text-xs text-muted-foreground">Detected legs ({result.legs.length})</Label>
             {result.legs.map((leg, i) => (
               <div key={i} className="flex items-center gap-2 text-xs bg-muted rounded px-2 py-1.5">
                 <span className="text-muted-foreground">#{i + 1}</span>
-                <span className="font-medium">{leg.pick ?? "—"}</span>
-                {leg.game && <span className="text-muted-foreground">· {leg.game}</span>}
-                {leg.odds && <Badge variant="outline" className="ml-auto text-xs">{leg.odds > 0 ? `+${leg.odds}` : leg.odds}</Badge>}
+                <span className="font-medium flex-1">{leg.pick ?? "—"}</span>
+                {leg.result && (
+                  <span className={`text-xs font-semibold ${leg.result === "WON" ? "text-green-400" : leg.result === "LOST" ? "text-red-400" : "text-yellow-400"}`}>
+                    {leg.result}
+                  </span>
+                )}
+                {leg.odds != null && <Badge variant="outline" className="text-xs">{leg.odds > 0 ? `+${leg.odds}` : leg.odds}</Badge>}
               </div>
             ))}
           </div>

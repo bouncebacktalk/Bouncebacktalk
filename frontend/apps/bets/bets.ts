@@ -78,7 +78,9 @@ export interface OcrResult {
   odds?: number;
   payout?: number;
   betType?: string;
-  legs?: Array<{ pick?: string; odds?: number; betType?: string; game?: string }>;
+  status?: BetStatus;
+  betDate?: string;
+  legs?: Array<{ pick?: string; odds?: number; betType?: string; game?: string; result?: BetStatus }>;
 }
 
 export const betsApi = {

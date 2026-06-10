@@ -48,15 +48,18 @@ export class OcrService {
 {
   "sportsbook": string or null,
   "stake": number (dollars wagered, e.g. 25.00),
-  "odds": number (American odds for the whole bet, e.g. -110 or +250),
+  "odds": number (American odds for the whole bet, e.g. -110 or 12725),
   "payout": number (total payout if bet wins, INCLUDING stake, e.g. 47.73),
   "betType": "STRAIGHT" or "PARLAY",
+  "status": "WON" or "LOST" or "PUSH" or "PENDING" (look for Won/Lost/Settled/Open/Pending on the slip — if clearly resolved use WON or LOST, otherwise PENDING),
+  "betDate": string ISO date "YYYY-MM-DD" (the date the bet was placed — look for Ticket time, Date, Placed, or any visible date on the slip. Use that exact date. If not found use null),
   "legs": [
     {
       "pick": string (what was picked — team name, player name, over/under, etc.),
       "odds": number (American odds for this leg, or null),
       "betType": string (one of: "Spread", "Moneyline", "Total", "Prop", "Futures", or describe it),
-      "game": string (matchup, e.g. "OKC Thunder vs Indiana Pacers")
+      "game": string (matchup, e.g. "OKC Thunder vs Indiana Pacers"),
+      "result": "WON" or "LOST" or "PUSH" or null (if individual leg result is shown)
     }
   ]
 }
@@ -66,10 +69,11 @@ Rules:
 - For a PARLAY, include ALL legs shown
 - payout = total you receive if you win (stake + profit)
 - If odds shown as decimal (e.g. 2.50), convert to American: (decimal - 1) * 100 if >= 2.0, or -100 / (decimal - 1) if < 2.0
-- IMPORTANT: In JSON, never write +12725. Write positive numbers without the + sign: 12725 not +12725
+- IMPORTANT: In JSON, NEVER prefix positive numbers with +. Write 12725 not +12725
 - If a value truly cannot be found, use null
 - picks like "Lakers -5.5", "Over 224.5", "LeBron James anytime scorer" are all valid picks
-- Always include the team/player name in the pick field`,
+- Always include the team/player name in the pick field
+- betDate: if ticket shows "2026/06/09 03:17:43 PM" extract "2026-06-09". Always YYYY-MM-DD format`,
                 },
                 {
                   type: 'image_url',
