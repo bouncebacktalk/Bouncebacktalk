@@ -27,10 +27,25 @@ export class SportsController {
     return this.sportsData.getScoresByDate(sport, date);
   }
 
-  /** GET /api/sports/live-scores — all sports in parallel, 60s cached */
+  /**
+   * GET /api/sports/live-scores
+   * Returns LiveGame[] for NBA + MLB (60s cached per sport).
+   * Optional ?date=YYYY-MM-DD to query a different date.
+   * NFL/NHL/NCAAB are not supported yet — use /api/sports/live-scores/status
+   * to check which sports are enabled.
+   */
   @Get('live-scores')
-  getLiveScores() {
-    return this.sportsData.getAllScoresToday();
+  getLiveScores(@Query('date') date?: string) {
+    return this.sportsData.getAllLiveGamesToday(date);
+  }
+
+  /** GET /api/sports/live-scores/status — which sports are supported */
+  @Get('live-scores/status')
+  getLiveScoresStatus() {
+    return {
+      supported: ['NBA', 'MLB'],
+      comingSoon: ['NFL', 'NHL', 'NCAAF', 'NCAAB'],
+    };
   }
 
   /** POST /api/sports/grade — manual trigger */
