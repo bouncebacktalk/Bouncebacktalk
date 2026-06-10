@@ -103,17 +103,30 @@ export const betsApi = {
     const token = currentAccessToken();
     const headers: Record<string, string> = { Accept: 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch('/api/bets/ocr', {
-      method: 'POST',
-      credentials: 'include',
-      headers,
-      body: form,
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      return { error: `HTTP_${res.status}`, ...body } as any;
+    // OpenAI Vision can take 60–90s — use a 2-minute timeout
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120_000);
+    try {
+      const res = await fetch('/api/bets/ocr', {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: form,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { error: `HTTP_${res.status}`, ...body } as any;
+      }
+      return res.json();
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return { error: 'TIMEOUT' } as any;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
     }
-    return res.json();
   },
 };
 

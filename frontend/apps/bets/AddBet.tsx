@@ -257,7 +257,7 @@ export function AddBet() {
             {ocrLoading ? (
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="size-6 text-red-400 animate-spin" />
-                <p className="text-sm text-muted-foreground">Reading your bet slip…</p>
+                <p className="text-sm text-muted-foreground">Reading your bet slip… this takes ~30–60 seconds</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
