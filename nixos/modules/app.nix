@@ -150,6 +150,8 @@ in {
           NODE_ENV=${if isDev then "development" else "production"}
           PORT=${toString cfg.network.backendPort}
           PUBLIC_URL=http://localhost:${toString cfg.network.appPort}
+          SPORTSDATA_API_KEY=cd48920d0d784a2199d1ceefa5183f6b
+          ODDS_API_KEY=3987a37833bfdb5954366c952b713632
         '';
       };
     })
