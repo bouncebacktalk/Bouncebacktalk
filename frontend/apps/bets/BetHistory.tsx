@@ -6,15 +6,8 @@ import {
   type LiveGame, type LegResult,
 } from "./useLiveScores";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { apiGet } from "../api/api";
-import { betsApi, formatOdds, formatMoney, type Bet, type BetStatus } from "./bets";
+import { betsApi, formatOdds, formatMoney, type Bet } from "./bets";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -62,62 +55,6 @@ const TYPE_FILTERS = [
   { label: "Parlay", value: "PARLAY" },
 ];
 
-// ── Settle Dialog ─────────────────────────────────────────────────────────────
-
-function SettleDialog({ bet, onClose, onSettled }: { bet: Bet; onClose: () => void; onSettled: () => void }) {
-  const [status, setStatus] = useState<BetStatus>("WON");
-  const [saving, setSaving] = useState(false);
-
-  async function settle() {
-    setSaving(true);
-    try {
-      await betsApi.update(bet.id, { status });
-      onSettled();
-      onClose();
-    } finally { setSaving(false); }
-  }
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="bg-[#1C1C1E] border-white/10 text-white rounded-3xl max-w-sm mx-auto">
-        <DialogHeader>
-          <DialogTitle className="text-white text-lg font-bold">Settle Bet</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <p className="text-sm text-[#8E8E93]">
-            {bet.type === "PARLAY" ? `${bet.legs.length}-Leg Parlay` : bet.legs[0]?.pick ?? "Bet"}
-          </p>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-[#8E8E93] uppercase tracking-wider">Result</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
-              <SelectTrigger className="bg-[#2C2C2E] border-white/10 text-white rounded-xl h-11">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#2C2C2E] border-white/10 text-white rounded-xl">
-                <SelectItem value="WON" className="text-green-400 focus:bg-white/10">✓  Won</SelectItem>
-                <SelectItem value="LOST" className="text-red-400 focus:bg-white/10">✗  Lost</SelectItem>
-                <SelectItem value="PUSH" className="text-blue-400 focus:bg-white/10">↔  Push</SelectItem>
-                <SelectItem value="VOID" className="text-[#8E8E93] focus:bg-white/10">⊘  Void</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter className="flex gap-3">
-          <Button variant="ghost" onClick={onClose} className="flex-1 text-[#8E8E93] rounded-xl h-11">
-            Cancel
-          </Button>
-          <Button
-            disabled={saving}
-            onClick={settle}
-            className="flex-1 bg-[#E21111] hover:bg-[#c81010] text-white rounded-xl h-11 font-bold"
-          >
-            {saving ? "Saving…" : "Confirm"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ── Score / status helpers ─────────────────────────────────────────────────────
 
