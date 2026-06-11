@@ -13,8 +13,8 @@ export class GradingService {
     private sportsData: SportsDataService,
   ) {}
 
-  /** Runs automatically every hour */
-  @Cron(CronExpression.EVERY_HOUR)
+  /** Runs automatically every 5 minutes */
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async autoCronGrade() {
     this.logger.log('Auto-grading: checking pending bets...');
     const result = await this.gradePendingBets();
