@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { LiveGame, LiveScoreProvider, Sport } from './live-score.types';
 import { MlbStatsProvider } from './providers/mlb-stats.provider';
+import { NbaSportsdataProvider } from './providers/nba-sportsdata.provider';
 
 const LIVE_POLL_MS    = 15_000;   // 15s when at least one game is live
 const IDLE_POLL_MS    = 5 * 60_000; // 5min when no games live
@@ -26,6 +27,7 @@ export class LiveScoresService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     // Register built-in providers
     this.register(new MlbStatsProvider());
+    this.register(new NbaSportsdataProvider());
 
     // Kick off the first poll immediately
     this.poll().catch(() => {});

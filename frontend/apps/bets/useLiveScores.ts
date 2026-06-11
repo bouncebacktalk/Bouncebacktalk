@@ -225,8 +225,8 @@ export function computeLegResult(leg: BetLeg, game: LiveGame): LegResult {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-const SUPPORTED_SPORTS = new Set(['MLB']);
-const COMING_SOON_SPORTS = new Set(['NBA', 'NFL', 'NHL', 'NCAAB', 'NCAAF']);
+const SUPPORTED_SPORTS = new Set(['MLB', 'NBA']);
+const COMING_SOON_SPORTS = new Set(['NFL', 'NHL', 'NCAAB', 'NCAAF']);
 
 export { SUPPORTED_SPORTS, COMING_SOON_SPORTS };
 
