@@ -126,31 +126,33 @@ export function matchLegToGame(leg: BetLeg, games: LiveGame[]): LiveGame | null 
   const pickStr = norm(leg.pick ?? '');
   const sport   = leg.sport?.toUpperCase();
 
-  const pool = sport ? games.filter((g) => g.sport?.toUpperCase() === sport) : games;
+  // Only search live games — never match a final game to a pending leg
+  const pool = games.filter((g) => g.isLive &&
+    (sport ? g.sport?.toUpperCase() === sport : true)
+  );
+  if (!pool.length) return null;
 
   for (const game of pool) {
-    // Game string must match BOTH teams
-    if (gameStr.length >= 3) {
-      const homeInGame = teamMatches(game.homeTeamCode, game.homeTeam, game.homeTeamCode) &&
-        (gameStr.includes(norm(game.homeTeamCode)) || gameStr.includes(norm(game.homeTeam.split(' ').pop() ?? '')));
-      const awayInGame = gameStr.includes(norm(game.awayTeamCode)) || gameStr.includes(norm(game.awayTeam.split(' ').pop() ?? ''));
-      if (homeInGame && awayInGame) return game;
+    const homeNick = norm(game.homeTeam.split(' ').pop() ?? '');
+    const awayNick = norm(game.awayTeam.split(' ').pop() ?? '');
+    const homeCode = norm(game.homeTeamCode);
+    const awayCode = norm(game.awayTeamCode);
 
-      // broader: game string contains 4-char fragment of each full name
-      const homeHit = gameStr.includes(norm(game.homeTeam).slice(0, 5)) || gameStr.includes(norm(game.homeTeamCode));
-      const awayHit = gameStr.includes(norm(game.awayTeam).slice(0, 5)) || gameStr.includes(norm(game.awayTeamCode));
-      if (homeHit && awayHit) return game;
+    // 1. Game string must contain tokens for BOTH teams
+    if (gameStr.length >= 4) {
+      const homeInGame = gameStr.includes(homeCode) || (homeNick.length > 2 && gameStr.includes(homeNick));
+      const awayInGame = gameStr.includes(awayCode) || (awayNick.length > 2 && gameStr.includes(awayNick));
+      if (homeInGame && awayInGame) return game;
     }
 
-    // Pick string — matches at least one team
-    if (pickStr.length >= 2) {
-      // Strip line suffix (e.g. "-1.5", "+110") to isolate team name
-      const teamPart = pickStr.replace(/[+-]?\d+(\.\d+)?$/, '').trim();
-      const query = teamPart.length >= 2 ? teamPart : pickStr;
-      if (
-        teamMatches(query, game.homeTeam, game.homeTeamCode) ||
-        teamMatches(query, game.awayTeam, game.awayTeamCode)
-      ) return game;
+    // 2. Pick string — only use if leg.game is absent, and require a meaningful team token (4+ chars)
+    if (!leg.game && pickStr.length >= 4) {
+      const teamPart = pickStr.replace(/[+\-]?\d+(\.\d+)?$/, '').trim();
+      const query = teamPart.length >= 4 ? teamPart : pickStr;
+      const hitsHome = teamMatches(query, game.homeTeam, game.homeTeamCode);
+      const hitsAway = teamMatches(query, game.awayTeam, game.awayTeamCode);
+      // Require the pick to match exactly one team (the picked side), not both
+      if ((hitsHome || hitsAway) && !(hitsHome && hitsAway)) return game;
     }
   }
   return null;
