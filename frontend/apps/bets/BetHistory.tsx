@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Search, ChevronDown, ChevronUp, Trash2, CheckCircle, TrendingUp, TrendingDown, Minus, Activity, X } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Trash2, TrendingUp, TrendingDown, Minus, Activity, X } from "lucide-react";
 import {
   useLiveScores, matchLegToGame, computeLegResult, getParlayStatus,
   COMING_SOON_SPORTS,
@@ -162,7 +162,6 @@ function LegStatusIcon({ status }: { status: LegResult }) {
 
 function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => void; liveGames: LiveGame[] }) {
   const [expanded, setExpanded] = useState(false);
-  const [settling, setSettling] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   async function deleteBet() {
@@ -185,9 +184,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
   return (
     <>
-      {settling && (
-        <SettleDialog bet={bet} onClose={() => setSettling(false)} onSettled={() => { setSettling(false); onRefresh(); }} />
-      )}
+
 
       <div
         className={`bg-[#1A1A1A] rounded-2xl border-l-4 overflow-hidden ${STATUS_BORDER[bet.status] ?? "border-l-white/10"}`}
@@ -387,14 +384,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
             {/* Actions */}
             <div className="flex gap-2 pt-1">
-              {isPending && (
-                <button
-                  onClick={() => setSettling(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-semibold rounded-xl py-2.5 active:scale-95 transition-transform"
-                >
-                  <CheckCircle className="size-4" /> Settle
-                </button>
-              )}
+
               <button
                 disabled={deleting}
                 onClick={deleteBet}
