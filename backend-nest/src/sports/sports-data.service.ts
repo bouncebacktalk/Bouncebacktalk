@@ -257,8 +257,8 @@ export class SportsDataService {
     const scoresUrl = `${ODDS_API_BASE}/sports/${sportKey}/scores?apiKey=${ODDS_API_KEY}&daysFrom=1&dateFormat=iso`;
 
     const [rawOdds, rawScores] = await Promise.all([
-      this.fetchJson<any[]>(oddsUrl),
-      this.fetchJson<any[]>(scoresUrl),
+      this.fetchJson<any[]>(oddsUrl).catch(() => [] as any[]),
+      this.fetchJson<any[]>(scoresUrl).catch(() => [] as any[]),
     ]);
 
     if (!Array.isArray(rawOdds) || rawOdds.length === 0) return this._oddsFallback(sport);
