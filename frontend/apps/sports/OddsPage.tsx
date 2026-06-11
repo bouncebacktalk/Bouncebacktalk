@@ -166,33 +166,33 @@ function GameCard({ game, liveGame }: { game: GameOdds; liveGame?: LiveGame | nu
 
       <div className="px-4 pt-3 pb-3">
         {/* Status row */}
-        <div className="flex items-center gap-1.5 mb-3">
+        <div className="flex items-center gap-1 mb-2">
           {badge.dot && (
             <span className="w-1.5 h-1.5 rounded-full bg-[#30D158] animate-pulse shrink-0" />
           )}
-          <span className={`text-[10px] font-bold uppercase tracking-widest ${badge.color}`}>
+          <span className={`text-[9px] font-bold uppercase tracking-widest ${badge.color}`}>
             {badge.text}
           </span>
         </div>
 
         {/* Teams */}
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {/* Away */}
-          <div className="flex items-center gap-3">
-            <Logo sport={game.sport} name={game.awayTeam} size={40} />
+          <div className="flex items-center gap-2.5">
+            <Logo sport={game.sport} name={game.awayTeam} size={30} />
             <div className="flex-1 min-w-0">
-              <p className={`text-[15px] font-bold leading-tight truncate ${
+              <p className={`text-[13px] font-bold leading-tight truncate ${
                 hasScore && !awayLeads ? "text-[#636366]" : "text-white"
               }`}>
                 {game.awayTeam.split(" ").slice(-1)[0]}
+                {awaySpread && <span className="ml-1.5 text-[9px] font-semibold text-[#48484A]">{awaySpread}</span>}
               </p>
-              <p className="text-[11px] text-[#636366] leading-none truncate mt-0.5">
+              <p className="text-[10px] text-[#636366] leading-none truncate">
                 {game.awayTeam.split(" ").slice(0, -1).join(" ")}
-                {awaySpread && <span className="ml-1.5 text-[#48484A]">{awaySpread}</span>}
               </p>
             </div>
             {hasScore && (
-              <span className={`text-[28px] font-black tabular-nums leading-none ${
+              <span className={`text-[22px] font-black tabular-nums leading-none ${
                 awayLeads ? "text-white" : "text-[#48484A]"
               }`}>
                 {awayScore}
@@ -201,27 +201,27 @@ function GameCard({ game, liveGame }: { game: GameOdds; liveGame?: LiveGame | nu
           </div>
 
           {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 shrink-0" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-[30px] shrink-0" />
             <div className="flex-1 h-px bg-[#2C2C2E]" />
           </div>
 
           {/* Home */}
-          <div className="flex items-center gap-3">
-            <Logo sport={game.sport} name={game.homeTeam} size={40} />
+          <div className="flex items-center gap-2.5">
+            <Logo sport={game.sport} name={game.homeTeam} size={30} />
             <div className="flex-1 min-w-0">
-              <p className={`text-[15px] font-bold leading-tight truncate ${
+              <p className={`text-[13px] font-bold leading-tight truncate ${
                 hasScore && !homeLeads ? "text-[#636366]" : "text-white"
               }`}>
                 {game.homeTeam.split(" ").slice(-1)[0]}
+                {homeSpread && <span className="ml-1.5 text-[9px] font-semibold text-[#48484A]">{homeSpread}</span>}
               </p>
-              <p className="text-[11px] text-[#636366] leading-none truncate mt-0.5">
+              <p className="text-[10px] text-[#636366] leading-none truncate">
                 {game.homeTeam.split(" ").slice(0, -1).join(" ")}
-                {homeSpread && <span className="ml-1.5 text-[#48484A]">{homeSpread}</span>}
               </p>
             </div>
             {hasScore && (
-              <span className={`text-[28px] font-black tabular-nums leading-none ${
+              <span className={`text-[22px] font-black tabular-nums leading-none ${
                 homeLeads ? "text-white" : "text-[#48484A]"
               }`}>
                 {homeScore}
@@ -234,19 +234,19 @@ function GameCard({ game, liveGame }: { game: GameOdds; liveGame?: LiveGame | nu
         {hasOdds && (
           <button
             onClick={() => setOddsOpen(o => !o)}
-            className="mt-3 w-full flex items-center justify-between pt-3 border-t border-[#2C2C2E]"
+            className="mt-2 w-full flex items-center justify-between pt-2 border-t border-[#2C2C2E]"
           >
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#48484A]">Betting Lines</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-[#48484A]">Lines</span>
             {oddsOpen
-              ? <ChevronUp className="size-3.5 text-[#48484A]" />
-              : <ChevronDown className="size-3.5 text-[#48484A]" />
+              ? <ChevronUp className="size-3 text-[#48484A]" />
+              : <ChevronDown className="size-3 text-[#48484A]" />
             }
           </button>
         )}
 
         {/* Odds panel */}
         {hasOdds && oddsOpen && (
-          <div className="mt-3 flex gap-1 bg-[#141414] rounded-xl p-3">
+          <div className="mt-2 flex gap-1 bg-[#141414] rounded-xl p-2.5">
             <Pill label="Away ML" value={fmtML(game.awayMoneyline)} />
             <div className="w-px bg-[#2C2C2E]" />
             <Pill label="Spread" value={game.spread != null ? String(game.spread) : "—"} />
