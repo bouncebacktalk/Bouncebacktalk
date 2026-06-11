@@ -1,56 +1,70 @@
 import { useEffect, useState, useCallback } from "react";
-import { Search, ChevronDown, Trash2, CheckCircle, Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Trash2, CheckCircle, TrendingUp, TrendingDown, Minus, Activity, X } from "lucide-react";
 import {
   useLiveScores, matchLegToGame, computeLegResult, getParlayStatus,
-  SUPPORTED_SPORTS, COMING_SOON_SPORTS,
+  COMING_SOON_SPORTS,
   type LiveGame, type LegResult,
 } from "./useLiveScores";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { apiGet } from "../api/api";
-import { betsApi, formatOdds, formatMoney, statusBg, type Bet, type BetStatus } from "./bets";
+import { betsApi, formatOdds, formatMoney, type Bet, type BetStatus } from "./bets";
 
-const STATUS_OPTIONS: { label: string; value: string }[] = [
-  { label: "All", value: "ALL" },
-  { label: "Pending", value: "PENDING" },
-  { label: "Won", value: "WON" },
-  { label: "Lost", value: "LOST" },
-  { label: "Push", value: "PUSH" },
-  { label: "Void", value: "VOID" },
+// ── Design tokens ─────────────────────────────────────────────────────────────
+
+const STATUS_COLOR: Record<string, string> = {
+  WON:     "bg-green-400",
+  LOST:    "bg-red-400",
+  PENDING: "bg-amber-400",
+  PUSH:    "bg-blue-400",
+  VOID:    "bg-[#8E8E93]",
+};
+const STATUS_TEXT: Record<string, string> = {
+  WON:     "text-green-400",
+  LOST:    "text-red-400",
+  PENDING: "text-amber-400",
+  PUSH:    "text-blue-400",
+  VOID:    "text-[#8E8E93]",
+};
+const STATUS_BORDER: Record<string, string> = {
+  WON:     "border-l-green-400/60",
+  LOST:    "border-l-red-400/60",
+  PENDING: "border-l-amber-400/40",
+  PUSH:    "border-l-blue-400/60",
+  VOID:    "border-l-white/10",
+};
+
+const SPORTSBOOK_COLORS: Record<string, string> = {
+  DraftKings: "#53D338", FanDuel: "#1493FF", BetMGM: "#C9A84C",
+  Caesars: "#0A8FFF", "ESPN Bet": "#FF6600", Fanatics: "#FF0060",
+};
+function sbColor(sb?: string) { return SPORTSBOOK_COLORS[sb ?? ""] ?? "#8E8E93"; }
+
+// ── Filter pills ──────────────────────────────────────────────────────────────
+
+const STATUS_FILTERS = [
+  { label: "All",     value: "ALL" },
+  { label: "Active",  value: "PENDING" },
+  { label: "Won",     value: "WON" },
+  { label: "Lost",    value: "LOST" },
+  { label: "Push",    value: "PUSH" },
 ];
 
-const TYPE_OPTIONS = [
-  { label: "All types", value: "ALL" },
+const TYPE_FILTERS = [
+  { label: "All",    value: "ALL" },
   { label: "Straight", value: "STRAIGHT" },
   { label: "Parlay", value: "PARLAY" },
 ];
 
-function SettleDialog({
-  bet,
-  onClose,
-  onSettled,
-}: {
-  bet: Bet;
-  onClose: () => void;
-  onSettled: () => void;
-}) {
+// ── Settle Dialog ─────────────────────────────────────────────────────────────
+
+function SettleDialog({ bet, onClose, onSettled }: { bet: Bet; onClose: () => void; onSettled: () => void }) {
   const [status, setStatus] = useState<BetStatus>("WON");
   const [saving, setSaving] = useState(false);
 
@@ -59,45 +73,43 @@ function SettleDialog({
     try {
       await betsApi.update(bet.id, { status });
       onSettled();
-    } catch {
-      setSaving(false);
-    }
+      onClose();
+    } finally { setSaving(false); }
   }
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="bg-[#1C1C1E] border-white/10 text-white rounded-3xl max-w-sm mx-auto">
         <DialogHeader>
-          <DialogTitle>Settle Bet</DialogTitle>
+          <DialogTitle className="text-white text-lg font-bold">Settle Bet</DialogTitle>
         </DialogHeader>
-        <div className="py-2 space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {bet.type === "PARLAY"
-              ? `${bet.legs.length}-leg Parlay`
-              : bet.legs[0]?.pick || "Straight Bet"}{" "}
-            · {formatOdds(bet.odds)} · ${Number(bet.stake).toFixed(2)} wagered
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-[#8E8E93]">
+            {bet.type === "PARLAY" ? `${bet.legs.length}-Leg Parlay` : bet.legs[0]?.pick ?? "Bet"}
           </p>
-          <div>
-            <Label className="text-xs">Result</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-[#8E8E93] uppercase tracking-wider">Result</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as BetStatus)}>
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className="bg-[#2C2C2E] border-white/10 text-white rounded-xl h-11">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="WON">Won ✓</SelectItem>
-                <SelectItem value="LOST">Lost ✗</SelectItem>
-                <SelectItem value="PUSH">Push ↔</SelectItem>
-                <SelectItem value="VOID">Void</SelectItem>
+              <SelectContent className="bg-[#2C2C2E] border-white/10 text-white rounded-xl">
+                <SelectItem value="WON" className="text-green-400 focus:bg-white/10">✓  Won</SelectItem>
+                <SelectItem value="LOST" className="text-red-400 focus:bg-white/10">✗  Lost</SelectItem>
+                <SelectItem value="PUSH" className="text-blue-400 focus:bg-white/10">↔  Push</SelectItem>
+                <SelectItem value="VOID" className="text-[#8E8E93] focus:bg-white/10">⊘  Void</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <DialogFooter className="flex gap-3">
+          <Button variant="ghost" onClick={onClose} className="flex-1 text-[#8E8E93] rounded-xl h-11">
+            Cancel
+          </Button>
           <Button
             disabled={saving}
             onClick={settle}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="flex-1 bg-[#E21111] hover:bg-[#c81010] text-white rounded-xl h-11 font-bold"
           >
             {saving ? "Saving…" : "Confirm"}
           </Button>
@@ -107,62 +119,45 @@ function SettleDialog({
   );
 }
 
-function ComingSoonBadge({ sport }: { sport?: string }) {
-  if (!sport) return null;
-  const upper = sport.toUpperCase();
-  if (!COMING_SOON_SPORTS.has(upper)) return null;
-  return (
-    <span className="inline-flex items-center text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-      {upper} live tracking coming soon
-    </span>
-  );
-}
+// ── Score / status helpers ─────────────────────────────────────────────────────
 
 function ScoreBadge({ game, result }: { game: LiveGame; result?: LegResult }) {
   if (game.homeScore == null && game.awayScore == null) return null;
-
   const awayNick = game.awayTeam.split(" ").pop() ?? game.awayTeamCode;
   const homeNick = game.homeTeam.split(" ").pop() ?? game.homeTeamCode;
-
-  let periodText = "";
-  if (game.isFinal) {
-    periodText = ` · ${game.periodLabel ?? "F"}`;
-  } else if (game.isLive && game.periodLabel) {
-    periodText = ` · ${game.periodLabel}`;
-    if (game.timeRemaining) periodText += ` ${game.timeRemaining}`;
-  }
-
-  const statusColors: Record<NonNullable<LegResult>, string> = {
-    winning: "bg-green-500/15 text-green-400 border-green-500/30",
-    losing:  "bg-red-500/15 text-red-400 border-red-500/30",
-    push:    "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  };
-
-  const baseClass = game.isLive
-    ? (result ? statusColors[result] : "bg-blue-500/15 text-blue-400 border-blue-500/30")
-    : "bg-muted/60 text-muted-foreground border-border";
+  let period = "";
+  if (game.isFinal) period = `· ${game.periodLabel ?? "F"}`;
+  else if (game.isLive && game.periodLabel) period = `· ${game.periodLabel}`;
 
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${baseClass}`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+      game.isLive
+        ? result === "winning" ? "bg-green-500/15 text-green-400 border-green-500/30"
+        : result === "losing"  ? "bg-red-500/15 text-red-400 border-red-500/30"
+        : "bg-blue-500/15 text-blue-400 border-blue-500/30"
+        : "bg-white/5 text-[#8E8E93] border-white/10"
+    }`}>
       {game.isLive && (
         <span className={`size-1.5 rounded-full inline-block animate-pulse ${
           result === "winning" ? "bg-green-400" : result === "losing" ? "bg-red-400" : "bg-blue-400"
         }`} />
       )}
       {awayNick} {game.awayScore} @ {homeNick} {game.homeScore}
-      <span className="opacity-60">{periodText}</span>
+      {period && <span className="opacity-60"> {period}</span>}
     </span>
   );
 }
 
 function LegStatusIcon({ status }: { status: LegResult }) {
   if (!status) return null;
-  if (status === "winning") return <TrendingUp className="size-3 text-green-400 shrink-0" />;
-  if (status === "losing")  return <TrendingDown className="size-3 text-red-400 shrink-0" />;
-  return <Minus className="size-3 text-yellow-400 shrink-0" />;
+  if (status === "winning") return <TrendingUp className="size-3 text-green-400" />;
+  if (status === "losing")  return <TrendingDown className="size-3 text-red-400" />;
+  return <Minus className="size-3 text-yellow-400" />;
 }
 
-function BetRow({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => void; liveGames: LiveGame[] }) {
+// ── Bet Card ──────────────────────────────────────────────────────────────────
+
+function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => void; liveGames: LiveGame[] }) {
   const [expanded, setExpanded] = useState(false);
   const [settling, setSettling] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -170,173 +165,149 @@ function BetRow({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => void
   async function deleteBet() {
     if (!confirm("Delete this bet?")) return;
     setDeleting(true);
-    try {
-      await betsApi.remove(bet.id);
-      onRefresh();
-    } catch {
-      setDeleting(false);
-    }
+    try { await betsApi.remove(bet.id); onRefresh(); }
+    catch { setDeleting(false); }
   }
 
-  const profitDisplay =
-    bet.status === "PENDING"
-      ? `$${Number(bet.stake).toFixed(2)} wagered`
-      : formatMoney(Number(bet.profit ?? 0));
+  const isPending = bet.status === "PENDING";
+  const profit = Number(bet.profit ?? 0);
+  const label = bet.type === "PARLAY"
+    ? `${bet.legs.length}-Leg Parlay`
+    : bet.legs[0]?.pick ?? "Straight Bet";
 
-  const profitColor =
-    bet.status === "WON"
-      ? "text-green-400"
-      : bet.status === "LOST"
-      ? "text-red-400"
-      : "text-muted-foreground";
+  // Parlay summary
+  const ps = bet.type === "PARLAY" && bet.legs.length > 1
+    ? getParlayStatus(bet.legs, liveGames)
+    : null;
 
   return (
     <>
       {settling && (
-        <SettleDialog
-          bet={bet}
-          onClose={() => setSettling(false)}
-          onSettled={() => { setSettling(false); onRefresh(); }}
-        />
+        <SettleDialog bet={bet} onClose={() => setSettling(false)} onSettled={() => { setSettling(false); onRefresh(); }} />
       )}
-      <div className="border-b border-border last:border-0">
-        <div
-          className="flex items-center gap-3 py-3 px-4 cursor-pointer hover:bg-muted/30 transition-colors"
-          onClick={() => setExpanded((p) => !p)}
+
+      <div
+        className={`bg-[#1A1A1A] rounded-2xl border-l-4 overflow-hidden ${STATUS_BORDER[bet.status] ?? "border-l-white/10"}`}
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)", borderRight: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        {/* Main row */}
+        <button
+          className="w-full text-left p-4"
+          onClick={() => setExpanded((e) => !e)}
         >
-          <Badge variant="outline" className={`shrink-0 text-xs ${statusBg(bet.status)}`}>
-            {bet.status}
-          </Badge>
+          <div className="flex items-start gap-3">
+            {/* Status dot */}
+            <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${STATUS_COLOR[bet.status] ?? "bg-[#8E8E93]"}`} />
 
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {bet.type === "PARLAY"
-                ? `${bet.legs.length}-leg Parlay`
-                : bet.legs[0]?.pick || "Straight Bet"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {bet.sportsbook ?? "—"} · {formatOdds(bet.odds)} ·{" "}
-              {new Date(bet.betDate).toLocaleDateString()}
-            </p>
-          </div>
-
-          <div className="text-right shrink-0">
-            <p className={`text-sm font-semibold ${profitColor}`}>{profitDisplay}</p>
-            <p className="text-xs text-muted-foreground">
-              {bet.status === "PENDING" ? "pending" : bet.status === "PUSH" ? "push" : bet.status === "WON" ? "profit" : "loss"}
-            </p>
-          </div>
-
-          <ChevronDown
-            className={`size-4 text-muted-foreground shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
-          />
-        </div>
-
-        {expanded && (
-          <div className="px-4 pb-4 space-y-3 bg-muted/20">
-            {/* Parlay progress bar */}
-            {bet.type === "PARLAY" && bet.legs.length > 1 && (() => {
-              const ps = getParlayStatus(bet.legs, liveGames);
-              return (
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Activity className="size-3" /> Parlay progress
-                    </span>
-                    <span className="font-mono">
-                      {ps.won}W · {ps.live > 0 ? `${ps.live} live · ` : ""}{ps.pending} pending · {ps.lost}L
-                    </span>
-                  </div>
-                  {/* Progress bar: green=won, blue=live, red=lost, gray=pending */}
-                  <div className="h-2 rounded-full bg-muted overflow-hidden flex gap-px">
-                    {ps.won > 0 && (
-                      <div className="bg-green-500 h-full transition-all rounded-l-full"
-                        style={{ width: `${(ps.won / ps.total) * 100}%` }} />
-                    )}
-                    {ps.live > 0 && (
-                      <div className="bg-blue-500 h-full transition-all animate-pulse"
-                        style={{ width: `${(ps.live / ps.total) * 100}%` }} />
-                    )}
-                    {ps.lost > 0 && (
-                      <div className="bg-red-500 h-full transition-all"
-                        style={{ width: `${(ps.lost / ps.total) * 100}%` }} />
-                    )}
-                  </div>
+            <div className="flex-1 min-w-0">
+              {/* Top: label + amount */}
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <p className="font-semibold text-white text-[15px] leading-snug truncate pr-2">
+                  {label}
+                </p>
+                <div className="text-right shrink-0">
+                  <p className={`text-base font-bold ${
+                    isPending ? "text-white" :
+                    profit >= 0 ? "text-green-400" : "text-red-400"
+                  }`}>
+                    {isPending ? `$${Number(bet.stake).toFixed(2)}` : formatMoney(profit)}
+                  </p>
+                  <p className="text-[10px] text-[#8E8E93]">{isPending ? "at risk" : "profit"}</p>
                 </div>
-              );
-            })()}
+              </div>
 
+              {/* Meta row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {bet.sportsbook && (
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                    style={{ color: sbColor(bet.sportsbook), background: `${sbColor(bet.sportsbook)}15` }}
+                  >
+                    {bet.sportsbook}
+                  </span>
+                )}
+                <span className="text-[10px] text-[#8E8E93]">
+                  {formatOdds(bet.odds)} · ${Number(bet.stake).toFixed(0)} stake
+                </span>
+                <span className="text-[10px] text-[#8E8E93]">
+                  {new Date(bet.betDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+                <span className={`text-[10px] font-bold uppercase ${STATUS_TEXT[bet.status]}`}>
+                  {bet.status}
+                </span>
+              </div>
+
+              {/* Parlay progress bar */}
+              {ps && (
+                <div className="mt-2.5 space-y-1">
+                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden flex">
+                    {ps.won  > 0 && <div className="bg-green-400 h-full transition-all" style={{ width: `${(ps.won / ps.total) * 100}%` }} />}
+                    {ps.live > 0 && <div className="bg-blue-400 h-full animate-pulse" style={{ width: `${(ps.live / ps.total) * 100}%` }} />}
+                    {ps.lost > 0 && <div className="bg-red-400 h-full transition-all" style={{ width: `${(ps.lost / ps.total) * 100}%` }} />}
+                  </div>
+                  <p className="text-[10px] text-[#8E8E93]">
+                    {ps.won}✓ {ps.lost > 0 ? `${ps.lost}✗ ` : ""}{ps.live > 0 ? `${ps.live} live ` : ""}{ps.pending > 0 ? `${ps.pending} pending` : ""}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Expand toggle */}
+            <div className="shrink-0 mt-1">
+              {expanded
+                ? <ChevronUp className="size-4 text-[#8E8E93]" />
+                : <ChevronDown className="size-4 text-[#8E8E93]" />
+              }
+            </div>
+          </div>
+        </button>
+
+        {/* Expanded section */}
+        {expanded && (
+          <div className="border-t border-white/[0.06] px-4 pb-4 pt-3 space-y-3">
             {/* Legs */}
             {bet.legs.length > 0 && (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {bet.legs.map((leg, i) => {
-                  const isPending = bet.status === "PENDING";
                   const game = isPending ? matchLegToGame(leg, liveGames) : null;
                   const result = game ? computeLegResult(leg, game) : null;
                   const isLive = game?.isLive ?? false;
-                  const sportUpper = (leg.sport ?? "").toUpperCase();
-                  const comingSoon = COMING_SOON_SPORTS.has(sportUpper);
+                  const comingSoon = COMING_SOON_SPORTS.has((leg.sport ?? "").toUpperCase());
 
                   return (
                     <div
                       key={leg.id}
-                      className={`flex flex-col gap-1.5 text-xs rounded-md px-2.5 py-2 border transition-colors ${
-                        isLive && result === "winning"
-                          ? "bg-green-500/5 border-green-500/25"
-                          : isLive && result === "losing"
-                          ? "bg-red-500/5 border-red-500/25"
-                          : isLive
-                          ? "bg-blue-500/5 border-blue-500/20"
-                          : "bg-muted/50 border-transparent"
+                      className={`rounded-xl px-3 py-2.5 text-sm ${
+                        isLive && result === "winning" ? "bg-green-500/10 border border-green-500/20"
+                        : isLive && result === "losing" ? "bg-red-500/10 border border-red-500/20"
+                        : "bg-white/[0.04] border border-white/[0.06]"
                       }`}
                     >
-                      {/* Leg header row */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-muted-foreground w-4 shrink-0 text-[10px]">{i + 1}.</span>
-                        <span className="font-medium text-foreground">{leg.pick ?? "—"}</span>
-                        {leg.line && <span className="text-muted-foreground">{leg.line}</span>}
-                        {leg.sport && (
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                            {leg.sport}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#8E8E93] text-xs w-4 shrink-0">{i + 1}.</span>
+                        <span className="font-medium text-white flex-1 min-w-0 truncate">{leg.pick ?? "—"}</span>
+                        {leg.line && <span className="text-[#8E8E93] text-xs shrink-0">{leg.line}</span>}
+                        {isLive && <LegStatusIcon status={result} />}
+                        {leg.odds != null && (
+                          <span className="font-mono text-[#8E8E93] text-xs shrink-0">
+                            {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
                           </span>
                         )}
-                        <div className="ml-auto flex items-center gap-1.5">
-                          {isLive && isPending && <LegStatusIcon status={result} />}
-                          {leg.odds != null && (
-                            <span className="font-mono text-muted-foreground text-[11px]">
-                              {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
-                            </span>
-                          )}
-                          {leg.result && (
-                            <Badge variant="outline" className={`text-[10px] ${statusBg(leg.result as BetStatus)}`}>
-                              {leg.result}
-                            </Badge>
-                          )}
-                        </div>
+                        {leg.result && (
+                          <span className={`text-[10px] font-bold uppercase shrink-0 ${STATUS_TEXT[leg.result]}`}>
+                            {leg.result}
+                          </span>
+                        )}
                       </div>
-
-                      {/* Live score */}
                       {game && (
-                        <div className="pl-5 flex items-center gap-2 flex-wrap">
+                        <div className="mt-1.5 pl-5">
                           <ScoreBadge game={game} result={result} />
-                          {isLive && result && (
-                            <span className={`text-[10px] font-bold tracking-wide ${
-                              result === "winning" ? "text-green-400" :
-                              result === "losing"  ? "text-red-400"   :
-                              "text-yellow-400"
-                            }`}>
-                              {result === "winning" ? "▲ WINNING" :
-                               result === "losing"  ? "▼ LOSING"  : "= PUSH"}
-                            </span>
-                          )}
                         </div>
                       )}
-
-                      {/* Coming soon */}
                       {isPending && !game && comingSoon && (
-                        <div className="pl-5">
-                          <ComingSoonBadge sport={leg.sport} />
-                        </div>
+                        <p className="mt-1 pl-5 text-[10px] text-amber-400">
+                          {(leg.sport ?? "").toUpperCase()} live tracking coming soon
+                        </p>
                       )}
                     </div>
                   );
@@ -345,32 +316,26 @@ function BetRow({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => void
             )}
 
             {bet.notes && (
-              <p className="text-xs text-muted-foreground italic px-1">{bet.notes}</p>
+              <p className="text-xs text-[#8E8E93] italic px-1">{bet.notes}</p>
             )}
 
             {/* Actions */}
-            <div className="flex items-center gap-2 pt-1">
-              {bet.status === "PENDING" && (
-                <>
-                  <Button
-                    size="sm"
-                    className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
-                    onClick={(e) => { e.stopPropagation(); setSettling(true); }}
-                  >
-                    <CheckCircle className="size-3 mr-1" /> Settle
-                  </Button>
-                </>
+            <div className="flex gap-2 pt-1">
+              {isPending && (
+                <button
+                  onClick={() => setSettling(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-semibold rounded-xl py-2.5 active:scale-95 transition-transform"
+                >
+                  <CheckCircle className="size-4" /> Settle
+                </button>
               )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs text-red-400 hover:text-red-300 ml-auto"
+              <button
                 disabled={deleting}
-                onClick={(e) => { e.stopPropagation(); deleteBet(); }}
+                onClick={deleteBet}
+                className="flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold rounded-xl py-2.5 px-4 active:scale-95 transition-transform disabled:opacity-50"
               >
-                <Trash2 className="size-3 mr-1" />
-                {deleting ? "Deleting…" : "Delete"}
-              </Button>
+                <Trash2 className="size-4" />
+              </button>
             </div>
           </div>
         )}
@@ -379,11 +344,33 @@ function BetRow({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => void
   );
 }
 
+// ── Loading skeleton ──────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <div className="bg-[#1A1A1A] rounded-2xl p-4 border border-white/[0.06] animate-pulse">
+      <div className="flex gap-3">
+        <div className="mt-1 w-2 h-2 rounded-full bg-white/10 shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="flex justify-between">
+            <div className="h-4 bg-white/10 rounded w-40" />
+            <div className="h-4 bg-white/10 rounded w-16" />
+          </div>
+          <div className="h-3 bg-white/5 rounded w-32" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 export function BetHistory() {
   const liveGames = useLiveScores();
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [page, setPage] = useState(1);
@@ -402,135 +389,130 @@ export function BetHistory() {
       if (statusFilter !== "ALL") params.status = statusFilter;
       if (typeFilter !== "ALL") params.type = typeFilter;
       if (search.trim()) params.search = search.trim();
-
       const data = await apiGet<Bet[]>(`/api/bets?${new URLSearchParams(params)}`);
       setBets(reset || p === 1 ? data : (prev) => [...prev, ...data]);
       setHasMore(data.length === PAGE_SIZE);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }, [page, statusFilter, typeFilter, search]);
 
   useEffect(() => { fetchBets(true); }, [statusFilter, typeFilter]);
-
   useEffect(() => {
     const t = setTimeout(() => fetchBets(true), 350);
     return () => clearTimeout(t);
   }, [search]);
+  useEffect(() => { if (page > 1) fetchBets(false); }, [page]);
 
-  function loadMore() {
-    setPage((p) => p + 1);
-  }
-
-  useEffect(() => {
-    if (page > 1) fetchBets(false);
-  }, [page]);
-
-  const totals = bets.reduce(
-    (acc, b) => {
-      if (b.status === "WON") acc.profit += Number(b.profit ?? 0);
-      if (b.status === "LOST") acc.profit += Number(b.profit ?? 0);
-      return acc;
-    },
-    { profit: 0 }
-  );
+  const pendingCount = bets.filter((b) => b.status === "PENDING").length;
 
   return (
-    <div className="space-y-5">
+    <div className="px-4 pt-10 pb-4 space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Bet History</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{bets.length} bets loaded</p>
+          <h1 className="text-2xl font-black text-white tracking-tight">My Bets</h1>
+          <p className="text-sm text-[#8E8E93] mt-0.5">
+            {pendingCount > 0 ? `${pendingCount} active` : "All bets"}
+          </p>
         </div>
-        <Button asChild size="sm" className="bg-red-600 hover:bg-red-700 text-white">
-          <a href="/add">+ Add Bet</a>
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSearch((s) => !s)}
+            className="w-9 h-9 rounded-full bg-[#1A1A1A] border border-white/[0.08] flex items-center justify-center"
+          >
+            {showSearch ? <X className="size-4 text-[#8E8E93]" /> : <Search className="size-4 text-[#8E8E93]" />}
+          </button>
+          <a
+            href="/add"
+            className="h-9 px-4 bg-[#E21111] text-white text-sm font-bold rounded-full flex items-center"
+          >
+            + Add
+          </a>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <Input
+      {/* Search bar */}
+      {showSearch && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#8E8E93]" />
+          <input
+            autoFocus
             placeholder="Search picks, sportsbooks…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-9 text-sm"
+            className="w-full bg-[#1A1A1A] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-[#8E8E93] outline-none focus:border-[#E21111]/40"
           />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-9 w-[130px] text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="h-9 w-[120px] text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TYPE_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Summary bar for filtered view */}
-      {bets.length > 0 && (statusFilter !== "ALL" || typeFilter !== "ALL" || search) && (
-        <div className="flex items-center gap-4 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-          <span>{bets.filter((b) => b.status === "WON").length} won</span>
-          <span>{bets.filter((b) => b.status === "LOST").length} lost</span>
-          <span>{bets.filter((b) => b.status === "PENDING").length} pending</span>
-          <span
-            className={`ml-auto font-semibold ${totals.profit >= 0 ? "text-green-400" : "text-red-400"}`}
-          >
-            {formatMoney(totals.profit)}
-          </span>
         </div>
       )}
 
-      <Card className="bg-card border-border">
-        <CardContent className="p-0">
-          {loading && bets.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-              Loading…
-            </div>
-          ) : bets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 gap-3">
-              <Minus className="size-8 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">No bets found.</p>
-              <Button asChild size="sm" className="bg-red-600 hover:bg-red-700 text-white">
-                <a href="/add">Add first bet</a>
-              </Button>
-            </div>
-          ) : (
-            <>
-              {bets.map((bet) => (
-                <BetRow key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveGames={liveGames} />
-              ))}
-              {hasMore && (
-                <div className="p-4 text-center border-t border-border">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={loadMore}
-                    disabled={loading}
-                  >
-                    {loading ? "Loading…" : "Load more"}
-                  </Button>
-                </div>
-              )}
-            </>
+      {/* Status filter pills */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setStatusFilter(f.value)}
+            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              statusFilter === f.value
+                ? "bg-[#E21111] text-white"
+                : "bg-[#1A1A1A] text-[#8E8E93] border border-white/[0.06]"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        <div className="h-1 shrink-0 w-px" />
+        {TYPE_FILTERS.slice(1).map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setTypeFilter(typeFilter === f.value ? "ALL" : f.value)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+              typeFilter === f.value
+                ? "bg-white/10 text-white border-white/20"
+                : "bg-transparent text-[#8E8E93] border-white/[0.06]"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Bet list */}
+      {loading && bets.length === 0 ? (
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : bets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-[#1A1A1A] flex items-center justify-center mb-4">
+            <Activity className="size-7 text-[#8E8E93]" />
+          </div>
+          <p className="text-white font-semibold text-lg mb-1">No bets found</p>
+          <p className="text-[#8E8E93] text-sm mb-5">
+            {statusFilter !== "ALL" ? "Try changing the filter above." : "Scan a bet slip to get started."}
+          </p>
+          <a
+            href="/add"
+            className="bg-[#E21111] text-white font-semibold text-sm px-6 py-3 rounded-full"
+          >
+            Scan Bet Slip
+          </a>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {bets.map((bet) => (
+            <BetCard key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveGames={liveGames} />
+          ))}
+          {hasMore && (
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={loading}
+              className="w-full py-3 rounded-2xl bg-[#1A1A1A] border border-white/[0.06] text-[#8E8E93] text-sm font-medium disabled:opacity-50"
+            >
+              {loading ? "Loading…" : "Load more"}
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }
