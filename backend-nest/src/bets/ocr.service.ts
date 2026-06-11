@@ -10,7 +10,7 @@ export class OcrService {
     odds?: number;
     payout?: number;
     betType?: string;
-    legs?: Array<{ pick?: string; odds?: number; betType?: string; game?: string }>;
+    legs?: Array<{ pick?: string; odds?: number; betType?: string; game?: string; sport?: string; league?: string }>;
     raw?: string;
     error?: string;
   }> {
@@ -58,7 +58,9 @@ export class OcrService {
       "pick": string (what was picked — team name, player name, over/under, etc.),
       "odds": number (American odds for this leg, or null),
       "betType": string (one of: "Spread", "Moneyline", "Total", "Prop", "Futures", or describe it),
-      "game": string (matchup, e.g. "OKC Thunder vs Indiana Pacers"),
+      "game": string (matchup using short codes e.g. "NYY vs BOS" or "LAL vs GSW"),
+      "sport": string (REQUIRED — always infer from teams/context: "MLB", "NBA", "NFL", "NHL", "NCAAB", "NCAAF"),
+      "league": string (same as sport),
       "result": "WON" or "LOST" or "PUSH" or null (if individual leg result is shown)
     }
   ]
@@ -73,6 +75,7 @@ Rules:
 - If a value truly cannot be found, use null
 - picks like "Lakers -5.5", "Over 224.5", "LeBron James anytime scorer" are all valid picks
 - Always include the team/player name in the pick field
+- REQUIRED: always set "sport" on every leg — infer from team names (e.g. Yankees/Dodgers/Cubs → "MLB", Lakers/Celtics/Warriors → "NBA", Chiefs/Cowboys → "NFL", Maple Leafs/Rangers → "NHL"). Never leave sport null
 - betDate: if ticket shows "2026/06/09 03:17:43 PM" extract "2026-06-09". Always YYYY-MM-DD format`,
                 },
                 {
