@@ -361,7 +361,10 @@ function extractBetTokens(bets: Bet[]): string[] {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function OddsPage() {
-  const [sport, setSport] = useState("NBA");
+  const [sport, setSport] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get("sport");
+    return p && ["NBA","NFL","MLB","NHL","NCAAF","NCAAB"].includes(p.toUpperCase()) ? p.toUpperCase() : "NBA";
+  });
   const [games, setGames] = useState<GameOdds[]>([]);
   const liveGames = useLiveScores();
   const [loading, setLoading] = useState(false);

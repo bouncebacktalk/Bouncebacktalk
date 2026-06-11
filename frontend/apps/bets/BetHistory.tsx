@@ -263,10 +263,12 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
                   const barWidth = `${barPct}%`;
 
+                  const legSport = (leg.sport ?? "").toUpperCase() || "NBA";
                   return (
                     <div
                       key={leg.id}
-                      className="bg-[#141414] border border-white/[0.05] rounded-xl px-3 pt-2.5 pb-2 text-sm"
+                      className="bg-[#141414] border border-white/[0.05] rounded-xl px-3 pt-2.5 pb-2 text-sm cursor-pointer active:scale-[0.98] transition-transform"
+                      onClick={() => { window.location.href = `/odds?sport=${legSport}`; }}
                     >
                       {/* Pick row */}
                       <div className="flex items-center gap-2 mb-2">
