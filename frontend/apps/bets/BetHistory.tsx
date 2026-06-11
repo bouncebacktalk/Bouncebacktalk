@@ -129,21 +129,23 @@ function ScoreBadge({ game, result }: { game: LiveGame; result?: LegResult }) {
   if (game.isFinal) period = `· ${game.periodLabel ?? "F"}`;
   else if (game.isLive && game.periodLabel) period = `· ${game.periodLabel}`;
 
+  const color = game.isLive
+    ? result === "winning" ? "bg-green-500/15 text-green-400 border-green-500/30"
+    : result === "losing"  ? "bg-red-500/15 text-red-400 border-red-500/30"
+    : "bg-white/[0.04] text-[#8E8E93] border-white/[0.08]"
+    : "bg-white/[0.04] text-[#8E8E93] border-white/[0.08]";
+
+  const dotColor = result === "winning" ? "bg-green-400"
+    : result === "losing" ? "bg-red-400"
+    : "bg-[#636366]";
+
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border ${
-      game.isLive
-        ? result === "winning" ? "bg-green-500/15 text-green-400 border-green-500/30"
-        : result === "losing"  ? "bg-red-500/15 text-red-400 border-red-500/30"
-        : "bg-blue-500/15 text-blue-400 border-blue-500/30"
-        : "bg-white/5 text-[#8E8E93] border-white/10"
-    }`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border ${color}`}>
       {game.isLive && (
-        <span className={`size-1.5 rounded-full inline-block animate-pulse ${
-          result === "winning" ? "bg-green-400" : result === "losing" ? "bg-red-400" : "bg-blue-400"
-        }`} />
+        <span className={`size-1.5 rounded-full inline-block animate-pulse ${dotColor}`} />
       )}
       {awayNick} {game.awayScore} @ {homeNick} {game.homeScore}
-      {period && <span className="opacity-60"> {period}</span>}
+      {period && <span className="opacity-50"> {period}</span>}
     </span>
   );
 }
