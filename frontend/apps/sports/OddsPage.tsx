@@ -265,14 +265,48 @@ function GameCard({ game, liveGame, hasBet }: { game: GameOdds; liveGame?: LiveG
 
         {/* Odds panel */}
         {hasOdds && oddsOpen && (
-          <div className="mt-2 flex gap-1 bg-[#141414] rounded-xl p-2.5">
-            <Pill label="Away ML" value={fmtML(game.awayMoneyline)} />
-            <div className="w-px bg-[#2C2C2E]" />
-            <Pill label="Spread" value={game.spread != null ? String(game.spread) : "—"} />
-            <div className="w-px bg-[#2C2C2E]" />
-            <Pill label="O/U" value={game.overUnder != null ? String(game.overUnder) : "—"} />
-            <div className="w-px bg-[#2C2C2E]" />
-            <Pill label="Home ML" value={fmtML(game.homeMoneyline)} />
+          <div className="mt-2 bg-[#141414] rounded-xl overflow-hidden">
+            {/* Header row */}
+            <div className="grid grid-cols-4 px-3 py-1.5 border-b border-[#2C2C2E]">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#48484A]">Book</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#48484A] text-center">Spread</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#48484A] text-center">O/U</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#48484A] text-right">ML</span>
+            </div>
+            {/* One row per sportsbook */}
+            {(game.sportsbooks.length > 0 ? game.sportsbooks : [{
+              sportsbook: "Consensus",
+              spread: game.spread,
+              overUnder: game.overUnder,
+              homeMoneyline: game.homeMoneyline,
+              awayMoneyline: game.awayMoneyline,
+            }]).map((sb, i) => (
+              <div
+                key={sb.sportsbook}
+                className={`grid grid-cols-4 px-3 py-2 items-center ${i % 2 === 0 ? "bg-transparent" : "bg-[#1A1A1A]"}`}
+              >
+                <span className="text-[11px] font-bold text-white truncate pr-1">{sb.sportsbook}</span>
+                <span className="text-[11px] font-mono text-[#8E8E93] text-center">
+                  {sb.spread != null ? (sb.spread > 0 ? `+${sb.spread}` : String(sb.spread)) : "—"}
+                </span>
+                <span className="text-[11px] font-mono text-[#8E8E93] text-center">
+                  {sb.overUnder ?? "—"}
+                </span>
+                <div className="flex flex-col items-end gap-0">
+                  <span className={`text-[10px] font-mono font-bold ${(sb.awayMoneyline ?? 0) > 0 ? "text-[#30D158]" : "text-[#FF453A]"}`}>
+                    {fmtML(sb.awayMoneyline)}
+                  </span>
+                  <span className={`text-[10px] font-mono font-bold ${(sb.homeMoneyline ?? 0) > 0 ? "text-[#30D158]" : "text-[#FF453A]"}`}>
+                    {fmtML(sb.homeMoneyline)}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {/* Away / Home label at bottom */}
+            <div className="px-3 py-1.5 border-t border-[#2C2C2E] flex justify-end gap-3">
+              <span className="text-[8px] text-[#48484A]">↑ {game.awayTeam.split(" ").slice(-1)[0]}</span>
+              <span className="text-[8px] text-[#48484A]">↓ {game.homeTeam.split(" ").slice(-1)[0]}</span>
+            </div>
           </div>
         )}
       </div>
