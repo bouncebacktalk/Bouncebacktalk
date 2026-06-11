@@ -159,7 +159,7 @@ in {
           ADMIN_EMAILS=bouncebacktalk@gmail.com
           MAIL_TRANSPORT=console
           MAIL_FROM="bouncebacktalk_app <noreply@bouncebacktalk.com>"
-          OPENAI_API_KEY=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
+          OPENAI_API_KEY=${OPENAI_API_KEY}
           DATABASE_URL=postgresql://app:1855fc58d876eded8fbe1cfc7ea6fdffdf57ad079165a852215ccb70a5d7d011@127.0.0.1:5432/playcode-bouncebacktalk-app
           POSTGRES_PASSWORD=1855fc58d876eded8fbe1cfc7ea6fdffdf57ad079165a852215ccb70a5d7d011
           REDIS_URL=redis://127.0.0.1:6379
