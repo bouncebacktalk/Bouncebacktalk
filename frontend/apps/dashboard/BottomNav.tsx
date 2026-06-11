@@ -1,10 +1,10 @@
-import { LayoutDashboard, History, Camera, TrendingUp, User } from "lucide-react";
+import { LayoutDashboard, History, Camera, Activity, User } from "lucide-react";
 
 const TABS = [
   { key: "dashboard", label: "Home",   icon: LayoutDashboard, href: "/dashboard" },
   { key: "history",   label: "Bets",   icon: History,         href: "/history"   },
   { key: "add",       label: "",        icon: Camera,          href: "/add",  isScan: true },
-  { key: "odds",      label: "Odds",   icon: TrendingUp,       href: "/odds"      },
+  { key: "odds",      label: "Scores", icon: Activity,        href: "/odds"      },
   { key: "profile",   label: "Profile", icon: User,            href: "/settings"  },
 ];
 
