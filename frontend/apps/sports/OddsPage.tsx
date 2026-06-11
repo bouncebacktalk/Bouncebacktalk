@@ -149,7 +149,7 @@ function GameCard({ game, liveGame, hasBet }: { game: GameOdds; liveGame?: LiveG
   const period    = liveGame?.periodLabel ?? null;
   const timeLeft  = liveGame?.timeRemaining ?? null;
 
-  const hasOdds = game.spread != null || game.homeMoneyline != null || game.overUnder != null;
+  const hasOdds = true; // always show Lines dropdown; shows "—" when data unavailable
 
   // Status
   const statusLabel = isFinal
@@ -346,17 +346,31 @@ export function OddsPage() {
   const fetchGames = useCallback(async (s: string) => {
     setLoading(true);
     try {
-      const data = await apiGet<GameOdds[]>(`/api/sports/odds?sport=${s}`);
+      const data = await apiGet<LiveGame[]>(`/api/sports/live-scores?sport=${s}`);
       if (!Array.isArray(data)) { setGames([]); return; }
-      // Keep only today's games (or live/final games with today's date)
-      const todayStr = new Date().toLocaleDateString("en-CA"); // "2026-06-11"
-      const todayGames = data.filter(g => {
-        try {
-          const gDate = new Date(g.gameTime).toLocaleDateString("en-CA");
-          return gDate === todayStr;
-        } catch { return false; }
-      });
-      setGames(todayGames);
+      // Map LiveGame → GameOdds shape (no odds data, cards handle nulls fine)
+      const todayStr = new Date().toLocaleDateString("en-CA");
+      const mapped: GameOdds[] = data
+        .filter(g => {
+          try { return new Date(g.gameTime).toLocaleDateString("en-CA") === todayStr; }
+          catch { return true; }
+        })
+        .map(g => ({
+          gameId: g.id,
+          sport: g.sport,
+          homeTeam: g.homeTeam,
+          awayTeam: g.awayTeam,
+          gameTime: g.gameTime,
+          status: g.isLive ? "InProgress" : g.isFinal ? "Final" : "Scheduled",
+          homeScore: g.homeScore,
+          awayScore: g.awayScore,
+          spread: null,
+          overUnder: null,
+          homeMoneyline: null,
+          awayMoneyline: null,
+          sportsbooks: [],
+        }));
+      setGames(mapped);
       setLastRefresh(new Date());
     } catch { setGames([]); }
     finally { setLoading(false); }
