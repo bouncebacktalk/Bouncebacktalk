@@ -277,65 +277,49 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
                   // ── Progress bar: math-based ─────────────────────────
                   const settled = !!leg.result;
 
-                  // Parse pick text to determine bet type + line value
+                  // Parse pick text — handle OCR variants: "Over 14.5" / "o 14.5" / "O14.5"
                   const pickText = (leg.pick ?? "").toLowerCase();
-                  const isOver  = /\bover\b/.test(pickText);
-                  const isUnder = /\bunder\b/.test(pickText);
+                  const isOver  = /\bover\b|\bo\s*\d/.test(pickText);
+                  const isUnder = /\bunder\b|\bu\s*\d/.test(pickText);
                   const isTotal = isOver || isUnder;
-                  const spreadMatch = pickText.match(/([+-]\d+(\.\d+)?)(?!\s*\d)/);
-                  const lineMatch   = pickText.match(/(?:over|under)\s*([\d.]+)/i)
-                                   || pickText.match(/([\d.]+)\s*(?:total|o\/u)/i);
-                  const lineValue   = lineMatch ? parseFloat(lineMatch[1]) : null;
-                  const spreadValue = !isTotal && spreadMatch ? parseFloat(spreadMatch[1]) : null;
 
-                  const homeScore = game?.homeScore ?? null;
-                  const awayScore = game?.awayScore ?? null;
-                  const currentTotal = (homeScore ?? 0) + (awayScore ?? 0);
+                  // Extract numeric line: "Over 14.5", "O 8.5", "-2.5", "+3"
+                  const totalLineMatch  = pickText.match(/(?:over|under|[ou])\s*([\d.]+)/i);
+                  const spreadLineMatch = pickText.match(/([+-]\d+(?:\.\d+)?)/);
+                  const totalLine  = isTotal && totalLineMatch  ? parseFloat(totalLineMatch[1])  : null;
+                  const spreadLine = !isTotal && spreadLineMatch ? parseFloat(spreadLineMatch[1]) : null;
 
-                  // Determine if this leg pick is home or away (for spread)
-                  // We use result from computeLegResult which already handles this
+                  const gHome = game?.homeScore ?? null;
+                  const gAway = game?.awayScore ?? null;
+                  const currentTotal = (gHome ?? 0) + (gAway ?? 0);
+
+                  // Compute fill percentage — purely how far along we are, NO win/loss color while live
                   let barPct = 0;
-
                   if (settled) {
                     barPct = 100;
                   } else if (isLive && game) {
-                    if (isTotal && lineValue && lineValue > 0) {
-                      // Actual score progress toward the line — 1-0 on Over 14.5 = 6.9%
-                      barPct = Math.min(100, Math.round((currentTotal / lineValue) * 100));
-                    } else if (spreadValue !== null && homeScore !== null && awayScore !== null) {
-                      // Pick team is winning/losing by how much vs the spread
-                      // result tells us if we're winning; margin tells us how close
-                      const margin = Math.abs((homeScore ?? 0) - (awayScore ?? 0));
-                      const needed = Math.abs(spreadValue);
-                      if (result === "winning") {
-                        // Already covering — scale 50–90% based on margin vs spread
-                        barPct = Math.min(90, 50 + Math.round((margin / Math.max(needed, 1)) * 40));
-                      } else if (result === "losing") {
-                        // Not covering — scale 10–49%
-                        barPct = Math.max(10, 50 - Math.round((margin / Math.max(needed, 1)) * 40));
-                      } else {
-                        barPct = 50; // push territory
-                      }
+                    if (isTotal && totalLine && totalLine > 0) {
+                      // e.g. 1+0=1 on Over 14.5 → 7%
+                      barPct = Math.min(99, Math.round((currentTotal / totalLine) * 100));
+                    } else if (spreadLine !== null && gHome !== null && gAway !== null) {
+                      // How much of the spread has been covered
+                      const margin = Math.abs(gHome - gAway);
+                      const needed = Math.abs(spreadLine);
+                      // 50% base + scale by margin/needed, capped at 95% while live
+                      barPct = Math.min(95, Math.max(5, Math.round(50 + (margin / Math.max(needed, 1)) * 45 * (result === "winning" ? 1 : -1))));
                     } else {
-                      // Moneyline — binary pulse
-                      barPct = result === "winning" ? 65 : result === "losing" ? 35 : 50;
+                      // Moneyline — no math possible, just show 50%
+                      barPct = 50;
                     }
                   }
 
-                  // Color: only apply win/loss color when settled or when we know direction
+                  // Color: NEUTRAL grey while live, only green/red/grey when fully settled
                   const barColor = settled
                     ? leg.result === "WON"  ? "bg-[#30D158]"
                     : leg.result === "LOST" ? "bg-[#E21111]"
-                    : "bg-[#636366]" // PUSH or VOID
-                    : isLive && isTotal
-                    ? barPct >= 100 ? "bg-[#30D158]"    // crossed the line
-                    : isOver  ? "bg-[#48484A]"           // still in play, neutral until hit
-                    : "bg-[#48484A]"
-                    : isLive
-                    ? result === "winning" ? "bg-[#30D158]"
-                    : result === "losing"  ? "bg-[#E21111]"
-                    : "bg-[#48484A]"
-                    : "bg-[#2C2C2E]";
+                    : "bg-[#636366]"        // PUSH or VOID → grey
+                    : isLive ? "bg-[#48484A]"   // always neutral while in progress
+                    : "bg-[#2C2C2E]";           // not started yet
 
                   const barWidth = `${barPct}%`;
 
