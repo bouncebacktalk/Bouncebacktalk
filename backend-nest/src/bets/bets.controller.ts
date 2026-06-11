@@ -1,10 +1,8 @@
 import {
   Body, Controller, Delete, Get, Param, ParseIntPipe,
-  Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors,
+  Patch, Post, Query, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BetsService } from './bets.service';
 import { OcrService } from './ocr.service';
 import { CreateBetDto, UpdateBetDto, BetFilterDto } from './dto/bets.dto';
@@ -42,16 +40,15 @@ export class BetsController {
 
   @Patch(':id')
   update(
-    @CurrentUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBetDto,
   ) {
-    return this.betsService.update(userId, id, dto);
+    return this.betsService.update(this.OWNER_ID, id, dto);
   }
 
   @Delete(':id')
-  remove(@CurrentUser('id') userId: number, @Param('id', ParseIntPipe) id: number) {
-    return this.betsService.remove(userId, id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.betsService.remove(this.OWNER_ID, id);
   }
 
   @Post('ocr')
