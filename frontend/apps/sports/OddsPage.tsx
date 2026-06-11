@@ -413,20 +413,23 @@ export function OddsPage() {
     const bL = bLg?.isLive  ?? b.status === "InProgress";
     const aF = aLg?.isFinal ?? a.status === "Final";
     const bF = bLg?.isFinal ?? b.status === "Final";
-    // 1. Live games always first
+    // 1. Final games always last — beats everything else
+    if (aF && !bF) return 1; if (!aF && bF) return -1;
+    // 2. Live games first (among non-finals)
     if (aL && !bL) return -1; if (!aL && bL) return 1;
-    // 2. Among live: bet games first
+    // 3. Among live: bet games first
     if (aL && bL) {
       const aBet = gameHasBet(a, betTokens) ? 1 : 0;
       const bBet = gameHasBet(b, betTokens) ? 1 : 0;
       if (aBet !== bBet) return bBet - aBet;
     }
-    // 3. Scheduled games: chronological by game time
+    // 4. Scheduled games: bet games first, then chronological
     if (!aL && !aF && !bL && !bF) {
+      const aBet = gameHasBet(a, betTokens) ? 1 : 0;
+      const bBet = gameHasBet(b, betTokens) ? 1 : 0;
+      if (aBet !== bBet) return bBet - aBet;
       return new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime();
     }
-    // 4. Final games last
-    if (aF && !bF) return 1; if (!aF && bF) return -1;
     return 0;
   });
 
