@@ -100,6 +100,30 @@ function fmtTime(iso: string) {
   catch { return iso; }
 }
 
+function initialSportFromUrl(): string {
+  if (typeof window === "undefined") return "NBA";
+  const p = new URLSearchParams(window.location.search).get("sport");
+  return p && SPORTS.includes(p.toUpperCase()) ? p.toUpperCase() : "NBA";
+}
+
+function liveGameToGameOdds(game: LiveGame): GameOdds {
+  return {
+    gameId: game.id,
+    sport: game.sport,
+    homeTeam: game.homeTeam,
+    awayTeam: game.awayTeam,
+    gameTime: game.gameTime,
+    status: game.isFinal ? "Final" : game.isLive ? "InProgress" : "Scheduled",
+    homeScore: game.homeScore,
+    awayScore: game.awayScore,
+    spread: null,
+    overUnder: null,
+    homeMoneyline: null,
+    awayMoneyline: null,
+    sportsbooks: [],
+  };
+}
+
 // ── Logo with fallback initials ───────────────────────────────────────────────
 function Logo({ sport, name, size = 44 }: { sport: string; name: string; size?: number }) {
   const [err, setErr] = useState(false);
@@ -361,10 +385,7 @@ function extractBetTokens(bets: Bet[]): string[] {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function OddsPage() {
-  const [sport, setSport] = useState(() => {
-    const p = new URLSearchParams(window.location.search).get("sport");
-    return p && ["NBA","NFL","MLB","NHL","NCAAF","NCAAB"].includes(p.toUpperCase()) ? p.toUpperCase() : "NBA";
-  });
+  const [sport, setSport] = useState(initialSportFromUrl);
   const [games, setGames] = useState<GameOdds[]>([]);
   const liveGames = useLiveScores();
   const [loading, setLoading] = useState(false);
@@ -398,7 +419,15 @@ export function OddsPage() {
   useEffect(() => { fetchGames(sport); }, [sport]);
 
 
-  const sorted = [...games].sort((a, b) => {
+  const fallbackGames = games.length > 0
+    ? []
+    : liveGames
+      .filter((game) => game.sport?.toUpperCase() === sport)
+      .map(liveGameToGameOdds);
+
+  const displayGames = games.length > 0 ? games : fallbackGames;
+
+  const sorted = [...displayGames].sort((a, b) => {
     const aLg = findLiveGame(a, liveGames), bLg = findLiveGame(b, liveGames);
     const aL = aLg?.isLive  ?? a.status === "InProgress";
     const bL = bLg?.isLive  ?? b.status === "InProgress";
