@@ -206,7 +206,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
             {bet.legs.length > 0 && (
               <div className="space-y-2">
                 {bet.legs.map((leg, i) => {
-                  const game = isPending ? matchLegToGame(leg, liveGames) : null;
+                  const game = !leg.result ? matchLegToGame(leg, liveGames) : null;
                   const result = game ? computeLegResult(leg, game) : null;
                   const isLive = game?.isLive ?? false;
                   const comingSoon = COMING_SOON_SPORTS.has((leg.sport ?? "").toUpperCase());
