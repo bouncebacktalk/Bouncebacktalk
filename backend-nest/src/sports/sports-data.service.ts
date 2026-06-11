@@ -251,10 +251,32 @@ export class SportsDataService {
   async getOddsByDate(sport: string, _date?: string): Promise<GameOdds[]> {
     const sportKey = ODDS_API_SPORT[sport.toUpperCase()];
     if (!sportKey) return [];
-    const url = `${ODDS_API_BASE}/sports/${sportKey}/odds?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`;
-    const raw = await this.fetchJson<any[]>(url);
-    if (!Array.isArray(raw) || raw.length === 0) return this._oddsFallback(sport);
-    return raw.map((g) => this._normalizeOddsApiGame(g, sport));
+
+    // Fetch odds + scores in parallel — same API key, same game IDs
+    const oddsUrl   = `${ODDS_API_BASE}/sports/${sportKey}/odds?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`;
+    const scoresUrl = `${ODDS_API_BASE}/sports/${sportKey}/scores?apiKey=${ODDS_API_KEY}&daysFrom=1&dateFormat=iso`;
+
+    const [rawOdds, rawScores] = await Promise.all([
+      this.fetchJson<any[]>(oddsUrl),
+      this.fetchJson<any[]>(scoresUrl),
+    ]);
+
+    if (!Array.isArray(rawOdds) || rawOdds.length === 0) return this._oddsFallback(sport);
+
+    // Build a score lookup map: game id → { homeScore, awayScore, completed, lastUpdate }
+    const scoreMap = new Map<string, { homeScore: number | null; awayScore: number | null; completed: boolean }>();
+    for (const s of (rawScores ?? [])) {
+      if (!s.id) continue;
+      const homeEntry = (s.scores ?? []).find((sc: any) => sc.name === s.home_team);
+      const awayEntry = (s.scores ?? []).find((sc: any) => sc.name === s.away_team);
+      scoreMap.set(s.id, {
+        homeScore: homeEntry ? Number(homeEntry.score) : null,
+        awayScore: awayEntry ? Number(awayEntry.score) : null,
+        completed: !!s.completed,
+      });
+    }
+
+    return rawOdds.map((g) => this._normalizeOddsApiGame(g, sport, scoreMap));
   }
 
   async getAllOddsToday(): Promise<{ sport: string; games: GameOdds[] }[]> {
@@ -289,7 +311,11 @@ export class SportsDataService {
     }));
   }
 
-  private _normalizeOddsApiGame(g: any, sport: string): GameOdds {
+  private _normalizeOddsApiGame(
+    g: any,
+    sport: string,
+    scoreMap: Map<string, { homeScore: number | null; awayScore: number | null; completed: boolean }> = new Map(),
+  ): GameOdds {
     const sportsbooks: SportsbookLine[] = [];
     const PRIORITY = ['draftkings', 'fanduel', 'betmgm', 'caesars', 'espnbet', 'betonlineag'];
     let spread: number | null = null;
@@ -325,15 +351,23 @@ export class SportsDataService {
       const f = sportsbooks[0];
       spread = f.spread; overUnder = f.overUnder; homeMoneyline = f.homeMoneyline; awayMoneyline = f.awayMoneyline;
     }
+    const score = scoreMap.get(g.id ?? '');
+    const commenced = g.commence_time && new Date(g.commence_time) < new Date();
+    const status = score?.completed
+      ? 'Final'
+      : commenced
+      ? 'InProgress'
+      : 'Scheduled';
+
     return {
       gameId: g.id ?? '',
       sport,
       homeTeam: g.home_team ?? '',
       awayTeam: g.away_team ?? '',
       gameTime: g.commence_time ?? '',
-      status: g.commence_time && new Date(g.commence_time) < new Date() ? 'InProgress' : 'Scheduled',
-      homeScore: null,
-      awayScore: null,
+      status,
+      homeScore: score?.homeScore ?? null,
+      awayScore: score?.awayScore ?? null,
       spread, overUnder, homeMoneyline, awayMoneyline, sportsbooks,
     };
   }
