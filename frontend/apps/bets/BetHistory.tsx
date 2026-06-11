@@ -274,39 +274,68 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
                   const isLive = game?.isLive ?? false;
                   const comingSoon = COMING_SOON_SPORTS.has((leg.sport ?? "").toUpperCase());
 
+                  // Progress bar color logic
+                  const settled = !!leg.result;
+                  const barColor = settled
+                    ? leg.result === "WON"  ? "bg-[#30D158]"
+                    : leg.result === "LOST" ? "bg-[#E21111]"
+                    : leg.result === "PUSH" ? "bg-[#636366]"
+                    : "bg-[#636366]"
+                    : isLive
+                    ? result === "winning" ? "bg-[#30D158]"
+                    : result === "losing"  ? "bg-[#E21111]"
+                    : "bg-[#48484A]"
+                    : "bg-[#2C2C2E]";
+
+                  const barWidth = settled ? "100%"
+                    : isLive
+                    ? result === "winning" ? "65%" : result === "losing" ? "35%" : "50%"
+                    : "0%";
+
                   return (
                     <div
                       key={leg.id}
-                      className={`rounded-xl px-3 py-2.5 text-sm ${
-                        isLive && result === "winning" ? "bg-green-500/10 border border-green-500/20"
-                        : isLive && result === "losing" ? "bg-red-500/10 border border-red-500/20"
-                        : "bg-white/[0.04] border border-white/[0.06]"
-                      }`}
+                      className="bg-[#141414] border border-white/[0.05] rounded-xl px-3 pt-2.5 pb-2 text-sm"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#8E8E93] text-xs w-4 shrink-0">{i + 1}.</span>
-                        <span className="font-medium text-white flex-1 min-w-0 truncate">{leg.pick ?? "—"}</span>
-                        {leg.line && <span className="text-[#8E8E93] text-xs shrink-0">{leg.line}</span>}
-                        {isLive && <LegStatusIcon status={result} />}
+                      {/* Pick row */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[#48484A] text-[10px] font-bold w-4 shrink-0">{i + 1}</span>
+                        <span className="font-semibold text-white flex-1 min-w-0 truncate text-[13px]">{leg.pick ?? "—"}</span>
                         {leg.odds != null && (
-                          <span className="font-mono text-[#8E8E93] text-xs shrink-0">
+                          <span className="font-mono text-[#636366] text-[11px] shrink-0">
                             {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
                           </span>
                         )}
-                        {leg.result && (
-                          <span className={`text-[10px] font-bold uppercase shrink-0 ${STATUS_TEXT[leg.result]}`}>
+                        {settled && (
+                          <span className={`text-[9px] font-black uppercase tracking-wider shrink-0 ${
+                            leg.result === "WON"  ? "text-[#30D158]"
+                            : leg.result === "LOST" ? "text-[#E21111]"
+                            : "text-[#636366]"
+                          }`}>
                             {leg.result}
                           </span>
                         )}
                       </div>
+
+                      {/* Progress bar */}
+                      <div className="relative h-1 bg-[#2C2C2E] rounded-full overflow-hidden">
+                        <div
+                          className={`absolute left-0 top-0 h-full rounded-full transition-all duration-700 ${barColor} ${
+                            isLive && !settled ? "animate-pulse" : ""
+                          }`}
+                          style={{ width: barWidth }}
+                        />
+                      </div>
+
+                      {/* Live score + game time */}
                       {game && (
-                        <div className="mt-1.5 pl-5">
+                        <div className="mt-1.5 pl-4">
                           <ScoreBadge game={game} result={result} />
                         </div>
                       )}
                       {isPending && !game && comingSoon && (
-                        <p className="mt-1 pl-5 text-[10px] text-amber-400">
-                          {(leg.sport ?? "").toUpperCase()} live tracking coming soon
+                        <p className="mt-1 pl-4 text-[10px] text-[#636366]">
+                          {(leg.sport ?? "").toUpperCase()} tracking coming soon
                         </p>
                       )}
                     </div>
