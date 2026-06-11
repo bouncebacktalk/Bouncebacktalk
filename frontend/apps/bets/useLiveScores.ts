@@ -122,37 +122,45 @@ function teamMatches(query: string, fullName: string, code: string): boolean {
 export function matchLegToGame(leg: BetLeg, games: LiveGame[]): LiveGame | null {
   if (!games.length) return null;
 
-  const gameStr = norm(leg.game ?? '');
-  const pickStr = norm(leg.pick ?? '');
-  const sport   = leg.sport?.toUpperCase();
+  const sport = leg.sport?.toUpperCase();
 
-  // Only search live games — never match a final game to a pending leg
-  const pool = games.filter((g) => g.isLive &&
+  // Only match live games — never attach a final to a pending leg
+  const pool = games.filter((g) =>
+    (g.isLive || g.state === 'live') &&
     (sport ? g.sport?.toUpperCase() === sport : true)
   );
   if (!pool.length) return null;
 
-  for (const game of pool) {
-    const homeNick = norm(game.homeTeam.split(' ').pop() ?? '');
-    const awayNick = norm(game.awayTeam.split(' ').pop() ?? '');
-    const homeCode = norm(game.homeTeamCode);
-    const awayCode = norm(game.awayTeamCode);
+  // Split game string BEFORE normalizing so "SAS vs NYK" → ["SAS", "NYK"]
+  const rawGame = (leg.game ?? '').trim();
+  const gameTokens = rawGame.length >= 2
+    ? rawGame.split(/\s+(?:vs\.?|@|at)\s+/i).map((t) => t.trim()).filter(Boolean)
+    : [];
 
-    // 1. Game string must contain tokens for BOTH teams
-    if (gameStr.length >= 4) {
-      const homeInGame = gameStr.includes(homeCode) || (homeNick.length > 2 && gameStr.includes(homeNick));
-      const awayInGame = gameStr.includes(awayCode) || (awayNick.length > 2 && gameStr.includes(awayNick));
-      if (homeInGame && awayInGame) return game;
+  // Strip the line number from pick: "SAS +2.5" → "SAS", "Over 8.5" → "Over 8.5"
+  const pickTeam = (leg.pick ?? '').replace(/\s*[+\-]\d+(\.\d+)?$/, '').trim();
+
+  for (const game of pool) {
+    // 1. Two-token game string — each token must match a different team
+    if (gameTokens.length >= 2) {
+      const [t1, t2] = gameTokens;
+      const t1Home = teamMatches(t1, game.homeTeam, game.homeTeamCode);
+      const t1Away = teamMatches(t1, game.awayTeam, game.awayTeamCode);
+      const t2Home = teamMatches(t2, game.homeTeam, game.homeTeamCode);
+      const t2Away = teamMatches(t2, game.awayTeam, game.awayTeamCode);
+      if ((t1Home && t2Away) || (t1Away && t2Home)) return game;
     }
 
-    // 2. Pick string — only use if leg.game is absent, and require a meaningful team token (4+ chars)
-    if (!leg.game && pickStr.length >= 4) {
-      const teamPart = pickStr.replace(/[+\-]?\d+(\.\d+)?$/, '').trim();
-      const query = teamPart.length >= 4 ? teamPart : pickStr;
-      const hitsHome = teamMatches(query, game.homeTeam, game.homeTeamCode);
-      const hitsAway = teamMatches(query, game.awayTeam, game.awayTeamCode);
-      // Require the pick to match exactly one team (the picked side), not both
-      if ((hitsHome || hitsAway) && !(hitsHome && hitsAway)) return game;
+    // 2. Single-token game string
+    if (gameTokens.length === 1) {
+      if (teamMatches(gameTokens[0], game.homeTeam, game.homeTeamCode) ||
+          teamMatches(gameTokens[0], game.awayTeam, game.awayTeamCode)) return game;
+    }
+
+    // 3. Pick team — used when game string is absent or didn't match
+    if (pickTeam.length >= 2 && !gameTokens.length) {
+      if (teamMatches(pickTeam, game.homeTeam, game.homeTeamCode) ||
+          teamMatches(pickTeam, game.awayTeam, game.awayTeamCode)) return game;
     }
   }
   return null;
