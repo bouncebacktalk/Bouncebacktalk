@@ -375,7 +375,7 @@ export function OddsPage() {
 
   // Fetch pending bets once on mount to know which games to highlight
   useEffect(() => {
-    apiGet<Bet[]>("/api/bets?status=PENDING")
+    apiGet<Bet[]>("/api/bets")
       .then(data => { if (Array.isArray(data)) setBetTokens(extractBetTokens(data)); })
       .catch(() => {});
   }, []);
