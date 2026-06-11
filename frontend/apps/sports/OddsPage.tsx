@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, Clock, CheckCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { apiGet, apiPost } from "../api/api";
+import { RefreshCw, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { apiGet } from "../api/api";
 import { useLiveScores, type LiveGame } from "../bets/useLiveScores";
 import type { Bet } from "../bets/bets";
 
@@ -368,8 +368,7 @@ export function OddsPage() {
   const [games, setGames] = useState<GameOdds[]>([]);
   const liveGames = useLiveScores();
   const [loading, setLoading] = useState(false);
-  const [grading, setGrading] = useState(false);
-  const [gradeMsg, setGradeMsg] = useState<string | null>(null);
+
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [betTokens, setBetTokens] = useState<string[]>([]);
 
@@ -398,14 +397,6 @@ export function OddsPage() {
 
   useEffect(() => { fetchGames(sport); }, [sport]);
 
-  async function grade() {
-    setGrading(true); setGradeMsg(null);
-    try {
-      const r = await apiPost<{ graded: number; skipped: number }>("/api/sports/grade", {});
-      setGradeMsg(`✓ Graded ${r.graded} bet${r.graded !== 1 ? "s" : ""}${r.skipped ? `, ${r.skipped} pending` : ""}`);
-    } catch { setGradeMsg("Grading failed"); }
-    finally { setGrading(false); }
-  }
 
   const sorted = [...games].sort((a, b) => {
     const aLg = findLiveGame(a, liveGames), bLg = findLiveGame(b, liveGames);
@@ -463,24 +454,10 @@ export function OddsPage() {
           >
             <RefreshCw className={`size-3.5 text-[#8E8E93] ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button
-            onClick={grade} disabled={grading}
-            className="h-9 px-3.5 rounded-full bg-[#E21111] text-white text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {grading
-              ? <RefreshCw className="size-3 animate-spin" />
-              : <CheckCircle className="size-3" />}
-            Grade
-          </button>
+
         </div>
       </div>
 
-      {/* Grade result */}
-      {gradeMsg && (
-        <div className="bg-[#1C3A24] border border-[#30D158]/20 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-[#30D158]">
-          {gradeMsg}
-        </div>
-      )}
 
       {/* Sport pills */}
       <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-1 px-1">
