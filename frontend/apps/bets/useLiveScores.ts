@@ -180,7 +180,7 @@ export function computeLegResult(leg: BetLeg, game: LiveGame): LegResult {
   const lower = raw.toLowerCase();
 
   // ── Over / Under ────────────────────────────────────────────────────────
-  const totalMatch = lower.match(/^(over|under)\s*([\d.]+)/);
+  const totalMatch = lower.match(/\b(over|under)\s*([\d.]+)/);
   if (totalMatch) {
     const dir  = totalMatch[1];
     const line = parseFloat(totalMatch[2]);
