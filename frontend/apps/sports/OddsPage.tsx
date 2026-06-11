@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { RefreshCw, Clock, CheckCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { apiGet, apiPost } from "../api/api";
 import { useLiveScores, type LiveGame } from "../bets/useLiveScores";
+import type { Bet } from "../bets/bets";
 
 const SPORTS = ["NBA", "NFL", "MLB", "NHL", "NCAAF", "NCAAB"];
 
@@ -135,7 +136,7 @@ function Pill({ label, value }: { label: string; value: string }) {
 }
 
 // ── Game card ─────────────────────────────────────────────────────────────────
-function GameCard({ game, liveGame }: { game: GameOdds; liveGame?: LiveGame | null }) {
+function GameCard({ game, liveGame, hasBet }: { game: GameOdds; liveGame?: LiveGame | null; hasBet?: boolean }) {
   const [oddsOpen, setOddsOpen] = useState(false);
 
   const isLive  = liveGame?.isLive  ?? game.status === "InProgress";
@@ -166,13 +167,20 @@ function GameCard({ game, liveGame }: { game: GameOdds; liveGame?: LiveGame | nu
 
       <div className="px-4 pt-3 pb-3">
         {/* Status row */}
-        <div className="flex items-center gap-1 mb-2">
-          {badge.dot && (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#30D158] animate-pulse shrink-0" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1">
+            {badge.dot && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#30D158] animate-pulse shrink-0" />
+            )}
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${badge.color}`}>
+              {badge.text}
+            </span>
+          </div>
+          {hasBet && (
+            <span className="text-[9px] font-black uppercase tracking-wider text-[#E21111] bg-[#E21111]/10 px-2 py-0.5 rounded-full">
+              Your Bet
+            </span>
           )}
-          <span className={`text-[9px] font-bold uppercase tracking-widest ${badge.color}`}>
-            {badge.text}
-          </span>
         </div>
 
         {/* Teams */}
@@ -280,6 +288,32 @@ function Skeleton() {
   );
 }
 
+// ── Check if a game matches any of the user's pending bet team tokens ─────────
+function gameHasBet(game: GameOdds, betTokens: string[]): boolean {
+  if (!betTokens.length) return false;
+  const haystack = normTeam(game.homeTeam) + normTeam(game.awayTeam);
+  return betTokens.some(t => haystack.includes(t));
+}
+
+// ── Extract short team tokens from pending bets ───────────────────────────────
+function extractBetTokens(bets: Bet[]): string[] {
+  const tokens: string[] = [];
+  for (const bet of bets) {
+    for (const leg of bet.legs) {
+      // leg.game = "Thunder vs Pacers", leg.pick = "OKC Thunder -5.5"
+      const sources = [leg.game ?? "", leg.pick ?? ""];
+      for (const src of sources) {
+        // pull last word of each team token (e.g. "Thunder", "Pacers")
+        src.split(/\s+vs\.?\s+|\s+@\s+/i).forEach(part => {
+          const word = part.trim().split(/\s+/).pop();
+          if (word && word.length >= 3) tokens.push(normTeam(word));
+        });
+      }
+    }
+  }
+  return [...new Set(tokens)];
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function OddsPage() {
   const [sport, setSport] = useState("NBA");
@@ -289,6 +323,14 @@ export function OddsPage() {
   const [grading, setGrading] = useState(false);
   const [gradeMsg, setGradeMsg] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [betTokens, setBetTokens] = useState<string[]>([]);
+
+  // Fetch pending bets once on mount to know which games to highlight
+  useEffect(() => {
+    apiGet<Bet[]>("/api/bets?status=PENDING")
+      .then(data => { if (Array.isArray(data)) setBetTokens(extractBetTokens(data)); })
+      .catch(() => {});
+  }, []);
 
   const fetchGames = useCallback(async (s: string) => {
     setLoading(true);
@@ -312,6 +354,9 @@ export function OddsPage() {
   }
 
   const sorted = [...games].sort((a, b) => {
+    const aBet = gameHasBet(a, betTokens) ? 1 : 0;
+    const bBet = gameHasBet(b, betTokens) ? 1 : 0;
+    if (aBet !== bBet) return bBet - aBet; // bet games first
     const aLg = findLiveGame(a, liveGames), bLg = findLiveGame(b, liveGames);
     const aL = aLg?.isLive  ?? a.status === "InProgress";
     const bL = bLg?.isLive  ?? b.status === "InProgress";
@@ -409,6 +454,7 @@ export function OddsPage() {
               key={game.gameId}
               game={game}
               liveGame={findLiveGame(game, liveGames)}
+              hasBet={gameHasBet(game, betTokens)}
             />
           ))}
         </div>
