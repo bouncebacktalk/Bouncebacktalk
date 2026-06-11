@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, Clock, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
+import { RefreshCw, Clock, CheckCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { apiGet, apiPost } from "../api/api";
 import { useLiveScores, type LiveGame } from "../bets/useLiveScores";
 
@@ -83,7 +83,6 @@ function getLogoUrl(sport: string, team: string) {
   return `https://a.espncdn.com/i/teamlogos/${sport.toLowerCase()}/500/${abbr}.png`;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function normTeam(s: string) { return (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
 function findLiveGame(game: GameOdds, liveGames: LiveGame[]): LiveGame | null {
   const hN = normTeam(game.homeTeam), aN = normTeam(game.awayTeam);
@@ -94,198 +93,187 @@ function findLiveGame(game: GameOdds, liveGames: LiveGame[]): LiveGame | null {
   }
   return null;
 }
-function fmtOdds(n: number | null) { return n == null ? "—" : n > 0 ? `+${n}` : String(n); }
+function fmtML(n: number | null) { return n == null ? "—" : n > 0 ? `+${n}` : String(n); }
 function fmtTime(iso: string) {
   try { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }); }
   catch { return iso; }
 }
 
-// ── Team logo with fallback ────────────────────────────────────────────────────
-function Logo({ sport, name, size = 40 }: { sport: string; name: string; size?: number }) {
+// ── Logo with fallback initials ───────────────────────────────────────────────
+function Logo({ sport, name, size = 44 }: { sport: string; name: string; size?: number }) {
   const [err, setErr] = useState(false);
   const url = getLogoUrl(sport, name);
-  const init = name.split(" ").slice(-1)[0]?.slice(0, 3) ?? "?";
+  const initials = name.split(" ").slice(-1)[0]?.slice(0, 3).toUpperCase() ?? "?";
   if (!url || err) {
     return (
-      <div style={{ width: size, height: size }}
-        className="rounded-full bg-white/[0.06] flex items-center justify-center shrink-0">
-        <span className="text-[9px] font-black text-[#8E8E93]">{init}</span>
+      <div
+        style={{ width: size, height: size }}
+        className="rounded-full bg-[#2C2C2E] flex items-center justify-center shrink-0"
+      >
+        <span className="text-[10px] font-black text-[#636366]">{initials}</span>
       </div>
     );
   }
   return (
-    <img src={url} alt={name} width={size} height={size} onError={() => setErr(true)}
-      className="object-contain shrink-0" style={{ width: size, height: size }} />
+    <img
+      src={url} alt={name}
+      style={{ width: size, height: size }}
+      className="object-contain shrink-0"
+      onError={() => setErr(true)}
+    />
   );
 }
 
-// ── Compact team row ──────────────────────────────────────────────────────────
-function TeamLine({ sport, name, score, winning, isScored }: {
-  sport: string; name: string; score: number | null;
-  winning: boolean; isScored: boolean;
-}) {
-  const nick = name.split(" ").slice(-1)[0];
-  const city = name.split(" ").slice(0, -1).join(" ");
+// ── Odds pill ─────────────────────────────────────────────────────────────────
+function Pill({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`flex items-center gap-2 ${isScored && !winning ? "opacity-40" : ""}`}>
-      <Logo sport={sport} name={name} size={28} />
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-bold text-white leading-tight truncate">{nick}</p>
-        <p className="text-[9px] text-[#8E8E93] leading-none truncate">{city}</p>
-      </div>
-      {isScored && (
-        <span className={`text-[22px] font-black tabular-nums leading-none ${
-          winning ? "text-white" : "text-[#555]"
-        }`}>
-          {score ?? "—"}
-        </span>
-      )}
+    <div className="flex flex-col items-center gap-0.5 flex-1">
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-[#636366]">{label}</span>
+      <span className="text-[12px] font-bold text-white font-mono">{value}</span>
     </div>
   );
 }
 
-// ── Odds collapsible ──────────────────────────────────────────────────────────
-function OddsDrawer({ game }: { game: GameOdds }) {
-  const [open, setOpen] = useState(false);
-  const hasOdds = game.spread != null || game.homeMoneyline != null || game.overUnder != null;
-  if (!hasOdds) return null;
-
-  const awayNick = game.awayTeam.split(" ").slice(-1)[0];
-  const homeNick = game.homeTeam.split(" ").slice(-1)[0];
-
-  return (
-    <div className="border-t border-white/[0.05] mt-2.5">
-      <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between pt-2 pb-0.5">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-[#555]">Betting Lines</span>
-        <div className="flex items-center gap-2">
-          {!open && game.homeMoneyline != null && (
-            <span className="text-[10px] font-mono text-[#555]">
-              {fmtOdds(game.awayMoneyline)} / {fmtOdds(game.homeMoneyline)}
-            </span>
-          )}
-          {open ? <ChevronUp className="size-3 text-[#555]" /> : <ChevronDown className="size-3 text-[#555]" />}
-        </div>
-      </button>
-      {open && (
-        <div className="pt-2 space-y-1.5">
-          {/* Header */}
-          <div className="grid grid-cols-4 text-[9px] font-bold uppercase tracking-wider text-[#555] mb-1">
-            <span />
-            <span className="text-center">Spread</span>
-            <span className="text-center">O/U</span>
-            <span className="text-center">ML</span>
-          </div>
-          {/* Away row */}
-          <div className="grid grid-cols-4 text-[11px] items-center">
-            <span className="text-[#8E8E93] font-semibold truncate">{awayNick}</span>
-            <span className="text-center font-mono text-white bg-[#111] rounded py-1">
-              {game.spread != null ? fmtOdds(-game.spread) : "—"}
-            </span>
-            <span className="text-center font-mono text-white bg-[#111] rounded py-1">
-              {game.overUnder != null ? `O ${game.overUnder}` : "—"}
-            </span>
-            <span className="text-center font-mono text-white bg-[#111] rounded py-1">
-              {fmtOdds(game.awayMoneyline)}
-            </span>
-          </div>
-          {/* Home row */}
-          <div className="grid grid-cols-4 text-[11px] items-center">
-            <span className="text-[#8E8E93] font-semibold truncate">{homeNick}</span>
-            <span className="text-center font-mono text-white bg-[#111] rounded py-1">
-              {fmtOdds(game.spread)}
-            </span>
-            <span className="text-center font-mono text-white bg-[#111] rounded py-1">
-              {game.overUnder != null ? `U ${game.overUnder}` : "—"}
-            </span>
-            <span className="text-center font-mono text-white bg-[#111] rounded py-1">
-              {fmtOdds(game.homeMoneyline)}
-            </span>
-          </div>
-          {/* Multi-book */}
-          {game.sportsbooks.length > 1 && (
-            <div className="pt-2 border-t border-white/[0.05] space-y-1">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#555]">Books (ML)</p>
-              {game.sportsbooks.slice(0, 4).map(sb => (
-                <div key={sb.sportsbook} className="grid grid-cols-4 text-[10px] items-center">
-                  <span className="text-[#555] truncate col-span-2">{sb.sportsbook}</span>
-                  <span className="text-center font-mono text-[#8E8E93]">{fmtOdds(sb.awayMoneyline)}</span>
-                  <span className="text-center font-mono text-white">{fmtOdds(sb.homeMoneyline)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Game card — compact ESPN-style ────────────────────────────────────────────
+// ── Game card ─────────────────────────────────────────────────────────────────
 function GameCard({ game, liveGame }: { game: GameOdds; liveGame?: LiveGame | null }) {
+  const [oddsOpen, setOddsOpen] = useState(false);
+
   const isLive  = liveGame?.isLive  ?? game.status === "InProgress";
   const isFinal = liveGame?.isFinal ?? game.status === "Final";
-  const isScored = isLive || isFinal;
-
   const awayScore = liveGame?.awayScore ?? game.awayScore;
   const homeScore = liveGame?.homeScore ?? game.homeScore;
   const hasScore  = awayScore != null && homeScore != null;
-  const awayWins  = hasScore && awayScore! > homeScore!;
-  const homeWins  = hasScore && homeScore! > awayScore!;
+  const awayLeads = hasScore && (awayScore! > homeScore!);
+  const homeLeads = hasScore && (homeScore! > awayScore!);
+  const period    = liveGame?.periodLabel ?? null;
+  const timeLeft  = liveGame?.timeRemaining ?? null;
 
-  const period = liveGame?.periodLabel ?? null;
-  const timeLeft = liveGame?.timeRemaining ?? null;
+  const hasOdds = game.spread != null || game.homeMoneyline != null || game.overUnder != null;
 
-  const statusLine = isLive
-    ? `${period ?? "LIVE"}${timeLeft ? ` · ${timeLeft}` : ""}`
-    : isFinal ? `Final${period ? ` · ${period}` : ""}`
-    : fmtTime(game.gameTime);
+  // Status badge
+  let badge = { text: fmtTime(game.gameTime), color: "text-[#636366]", dot: false };
+  if (isLive)  badge = { text: [period, timeLeft].filter(Boolean).join(" · ") || "LIVE", color: "text-[#30D158]", dot: true };
+  if (isFinal) badge = { text: `Final${period ? ` · ${period}` : ""}`, color: "text-[#636366]", dot: false };
+
+  // Spread display
+  const awaySpread = game.spread != null ? (game.spread > 0 ? `+${game.spread}` : String(game.spread)) : null;
+  const homeSpread = game.spread != null ? (game.spread > 0 ? `-${game.spread}` : `+${Math.abs(game.spread)}`) : null;
 
   return (
-    <div className={`bg-[#1C1C1E] rounded-2xl overflow-hidden border ${
-      isLive ? "border-green-500/30" : "border-white/[0.05]"
-    }`}>
-      {isLive && <div className="h-[2px] bg-gradient-to-r from-green-500 to-emerald-400" />}
+    <div className={`bg-[#1C1C1E] rounded-2xl overflow-hidden ${isLive ? "ring-1 ring-[#30D158]/25" : ""}`}>
+      {/* Live bar */}
+      {isLive && <div className="h-[2px] bg-gradient-to-r from-[#30D158] via-[#34C759] to-transparent" />}
 
-      <div className="p-3">
-        {/* Status */}
-        <div className="flex items-center gap-1.5 mb-2.5">
-          {isLive && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />}
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${
-            isLive ? "text-green-400" : "text-[#555]"
-          }`}>
-            {statusLine}
+      <div className="px-4 pt-3 pb-3">
+        {/* Status row */}
+        <div className="flex items-center gap-1.5 mb-3">
+          {badge.dot && (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#30D158] animate-pulse shrink-0" />
+          )}
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${badge.color}`}>
+            {badge.text}
           </span>
         </div>
 
         {/* Teams */}
-        <div className="space-y-2">
-          <TeamLine sport={game.sport} name={game.awayTeam}
-            score={awayScore} winning={awayWins} isScored={isScored} />
-          <div className="h-px bg-white/[0.04] ml-9" />
-          <TeamLine sport={game.sport} name={game.homeTeam}
-            score={homeScore} winning={homeWins} isScored={isScored} />
+        <div className="space-y-3">
+          {/* Away */}
+          <div className="flex items-center gap-3">
+            <Logo sport={game.sport} name={game.awayTeam} size={40} />
+            <div className="flex-1 min-w-0">
+              <p className={`text-[15px] font-bold leading-tight truncate ${
+                hasScore && !awayLeads ? "text-[#636366]" : "text-white"
+              }`}>
+                {game.awayTeam.split(" ").slice(-1)[0]}
+              </p>
+              <p className="text-[11px] text-[#636366] leading-none truncate mt-0.5">
+                {game.awayTeam.split(" ").slice(0, -1).join(" ")}
+                {awaySpread && <span className="ml-1.5 text-[#48484A]">{awaySpread}</span>}
+              </p>
+            </div>
+            {hasScore && (
+              <span className={`text-[28px] font-black tabular-nums leading-none ${
+                awayLeads ? "text-white" : "text-[#48484A]"
+              }`}>
+                {awayScore}
+              </span>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 shrink-0" />
+            <div className="flex-1 h-px bg-[#2C2C2E]" />
+          </div>
+
+          {/* Home */}
+          <div className="flex items-center gap-3">
+            <Logo sport={game.sport} name={game.homeTeam} size={40} />
+            <div className="flex-1 min-w-0">
+              <p className={`text-[15px] font-bold leading-tight truncate ${
+                hasScore && !homeLeads ? "text-[#636366]" : "text-white"
+              }`}>
+                {game.homeTeam.split(" ").slice(-1)[0]}
+              </p>
+              <p className="text-[11px] text-[#636366] leading-none truncate mt-0.5">
+                {game.homeTeam.split(" ").slice(0, -1).join(" ")}
+                {homeSpread && <span className="ml-1.5 text-[#48484A]">{homeSpread}</span>}
+              </p>
+            </div>
+            {hasScore && (
+              <span className={`text-[28px] font-black tabular-nums leading-none ${
+                homeLeads ? "text-white" : "text-[#48484A]"
+              }`}>
+                {homeScore}
+              </span>
+            )}
+          </div>
         </div>
 
-        <OddsDrawer game={game} />
+        {/* Odds toggle */}
+        {hasOdds && (
+          <button
+            onClick={() => setOddsOpen(o => !o)}
+            className="mt-3 w-full flex items-center justify-between pt-3 border-t border-[#2C2C2E]"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#48484A]">Betting Lines</span>
+            {oddsOpen
+              ? <ChevronUp className="size-3.5 text-[#48484A]" />
+              : <ChevronDown className="size-3.5 text-[#48484A]" />
+            }
+          </button>
+        )}
+
+        {/* Odds panel */}
+        {hasOdds && oddsOpen && (
+          <div className="mt-3 flex gap-1 bg-[#141414] rounded-xl p-3">
+            <Pill label="Away ML" value={fmtML(game.awayMoneyline)} />
+            <div className="w-px bg-[#2C2C2E]" />
+            <Pill label="Spread" value={game.spread != null ? String(game.spread) : "—"} />
+            <div className="w-px bg-[#2C2C2E]" />
+            <Pill label="O/U" value={game.overUnder != null ? String(game.overUnder) : "—"} />
+            <div className="w-px bg-[#2C2C2E]" />
+            <Pill label="Home ML" value={fmtML(game.homeMoneyline)} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
-function SkeletonCard() {
+function Skeleton() {
   return (
-    <div className="bg-[#1C1C1E] rounded-2xl p-3 border border-white/[0.05] animate-pulse space-y-2">
-      <div className="h-2 bg-white/[0.05] rounded w-12" />
+    <div className="bg-[#1C1C1E] rounded-2xl p-4 animate-pulse space-y-3">
+      <div className="h-2.5 w-10 bg-[#2C2C2E] rounded-full" />
       {[0, 1].map(i => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-white/[0.06] shrink-0" />
-          <div className="flex-1 space-y-1">
-            <div className="h-3 bg-white/[0.08] rounded w-20" />
-            <div className="h-2 bg-white/[0.04] rounded w-12" />
+        <div key={i} className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[#2C2C2E] shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3.5 bg-[#2C2C2E] rounded w-24" />
+            <div className="h-2.5 bg-[#242424] rounded w-16" />
           </div>
-          <div className="h-5 w-6 bg-white/[0.06] rounded" />
+          <div className="w-7 h-7 bg-[#2C2C2E] rounded" />
         </div>
       ))}
     </div>
@@ -299,7 +287,7 @@ export function OddsPage() {
   const liveGames = useLiveScores();
   const [loading, setLoading] = useState(false);
   const [grading, setGrading] = useState(false);
-  const [gradeResult, setGradeResult] = useState<{ graded: number; skipped: number } | null>(null);
+  const [gradeMsg, setGradeMsg] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const fetchGames = useCallback(async (s: string) => {
@@ -314,19 +302,19 @@ export function OddsPage() {
 
   useEffect(() => { fetchGames(sport); }, [sport]);
 
-  async function gradeNow() {
-    setGrading(true); setGradeResult(null);
+  async function grade() {
+    setGrading(true); setGradeMsg(null);
     try {
       const r = await apiPost<{ graded: number; skipped: number }>("/api/sports/grade", {});
-      setGradeResult(r);
-    } catch { setGradeResult({ graded: 0, skipped: 0 }); }
+      setGradeMsg(`✓ Graded ${r.graded} bet${r.graded !== 1 ? "s" : ""}${r.skipped ? `, ${r.skipped} pending` : ""}`);
+    } catch { setGradeMsg("Grading failed"); }
     finally { setGrading(false); }
   }
 
-  const sortedGames = [...games].sort((a, b) => {
+  const sorted = [...games].sort((a, b) => {
     const aLg = findLiveGame(a, liveGames), bLg = findLiveGame(b, liveGames);
-    const aL = aLg?.isLive ?? a.status === "InProgress";
-    const bL = bLg?.isLive ?? b.status === "InProgress";
+    const aL = aLg?.isLive  ?? a.status === "InProgress";
+    const bL = bLg?.isLive  ?? b.status === "InProgress";
     const aF = aLg?.isFinal ?? a.status === "Final";
     const bF = bLg?.isFinal ?? b.status === "Final";
     if (aL && !bL) return -1; if (!aL && bL) return 1;
@@ -334,78 +322,94 @@ export function OddsPage() {
     return 0;
   });
 
-  const liveCount = sortedGames.filter(g => {
+  const liveCount = sorted.filter(g => {
     const lg = findLiveGame(g, liveGames);
     return lg?.isLive ?? g.status === "InProgress";
   }).length;
 
   return (
-    <div className="px-3 pt-10 pb-28 space-y-4">
+    <div className="px-4 pt-10 pb-28 space-y-4">
+
       {/* Header */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Scores</h1>
-          <p className="text-[11px] text-[#555] mt-0.5">
+          <h1 className="text-[26px] font-black text-white tracking-tight leading-none">Scores</h1>
+          <p className="text-[12px] text-[#636366] mt-1">
             {lastRefresh
-              ? lastRefresh.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-              : "Today's games"}
+              ? `Updated ${lastRefresh.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+              : "Today's matchups"}
             {liveCount > 0 && (
-              <span className="text-green-400 ml-1.5 inline-flex items-center gap-1">
-                · <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> {liveCount} live
+              <span className="text-[#30D158] ml-2">
+                · {liveCount} live
               </span>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => fetchGames(sport)} disabled={loading}
-            className="w-8 h-8 rounded-full bg-[#1C1C1E] border border-white/[0.07] flex items-center justify-center disabled:opacity-40">
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchGames(sport)} disabled={loading}
+            className="w-9 h-9 rounded-full bg-[#1C1C1E] flex items-center justify-center disabled:opacity-40"
+          >
             <RefreshCw className={`size-3.5 text-[#8E8E93] ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button onClick={gradeNow} disabled={grading}
-            className="h-8 px-3 bg-[#E21111] hover:bg-[#c81010] text-white text-[11px] font-bold rounded-full flex items-center gap-1.5 disabled:opacity-60 transition-colors">
+          <button
+            onClick={grade} disabled={grading}
+            className="h-9 px-3.5 rounded-full bg-[#E21111] text-white text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+          >
             {grading
-              ? <><RefreshCw className="size-3 animate-spin" /> Grading…</>
-              : <><CheckCircle className="size-3" /> Grade</>}
+              ? <RefreshCw className="size-3 animate-spin" />
+              : <CheckCircle className="size-3" />}
+            Grade
           </button>
         </div>
       </div>
 
-      {gradeResult && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2 text-xs text-green-400 font-medium">
-          ✓ Graded {gradeResult.graded} bet{gradeResult.graded !== 1 ? "s" : ""}.
-          {gradeResult.skipped > 0 && ` ${gradeResult.skipped} still pending.`}
+      {/* Grade result */}
+      {gradeMsg && (
+        <div className="bg-[#1C3A24] border border-[#30D158]/20 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-[#30D158]">
+          {gradeMsg}
         </div>
       )}
 
       {/* Sport pills */}
-      <div className="flex gap-1.5 overflow-x-auto scrollbar-none px-1">
+      <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-1 px-1">
         {SPORTS.map(s => (
-          <button key={s} onClick={() => setSport(s)}
-            className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
-              sport === s ? "bg-[#E21111] text-white" : "bg-[#1C1C1E] text-[#8E8E93] border border-white/[0.06]"
-            }`}>
+          <button
+            key={s} onClick={() => setSport(s)}
+            className={`shrink-0 px-4 py-2 rounded-full text-[12px] font-bold transition-all ${
+              sport === s
+                ? "bg-[#E21111] text-white shadow-lg shadow-[#E21111]/20"
+                : "bg-[#1C1C1E] text-[#8E8E93]"
+            }`}
+          >
             {s}
           </button>
         ))}
       </div>
 
-      {/* 2-column grid */}
+      {/* Game list */}
       {loading ? (
-        <div className="grid grid-cols-2 gap-2.5">
-          {[1,2,3,4,5,6].map(i => <SkeletonCard key={i} />)}
+        <div className="space-y-3">
+          {[1,2,3,4].map(i => <Skeleton key={i} />)}
         </div>
-      ) : sortedGames.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#1C1C1E] flex items-center justify-center">
-            <Clock className="size-5 text-[#555]" />
+      ) : sorted.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <div className="w-14 h-14 rounded-full bg-[#1C1C1E] flex items-center justify-center">
+            <Clock className="size-6 text-[#48484A]" />
           </div>
-          <p className="text-white font-semibold text-sm">No {sport} games today</p>
-          <p className="text-[#555] text-xs">Switch leagues above</p>
+          <div className="text-center">
+            <p className="text-white font-bold text-[15px]">No {sport} games today</p>
+            <p className="text-[#636366] text-[13px] mt-1">Check back later or try another league</p>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5">
-          {sortedGames.map(game => (
-            <GameCard key={game.gameId} game={game} liveGame={findLiveGame(game, liveGames)} />
+        <div className="space-y-3">
+          {sorted.map(game => (
+            <GameCard
+              key={game.gameId}
+              game={game}
+              liveGame={findLiveGame(game, liveGames)}
+            />
           ))}
         </div>
       )}
