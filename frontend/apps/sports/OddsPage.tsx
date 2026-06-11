@@ -430,6 +430,31 @@ export function OddsPage() {
     setLoading(true);
     try {
       const data = await apiGet<GameOdds[]>(`/api/sports/odds?sport=${s}`);
+
+      if (s === "MLB" && (!Array.isArray(data) || data.length === 0)) {
+        const live = await apiGet<LiveGame[]>("/api/sports/live-scores");
+        const fallbackGames = live
+          .filter(g => g.sport === "MLB")
+          .map(g => ({
+            gameId: g.id,
+            sport: "MLB",
+            homeTeam: g.homeTeam,
+            awayTeam: g.awayTeam,
+            homeScore: g.homeScore,
+            awayScore: g.awayScore,
+            gameTime: g.gameTime,
+            status: g.isLive ? "InProgress" : g.isFinal ? "Final" : "Scheduled",
+            spread: null,
+            homeMoneyline: null,
+            awayMoneyline: null,
+            overUnder: null
+          }));
+
+        setGames(fallbackGames as any);
+        setLastRefresh(new Date());
+        return;
+      }
+
       if (!Array.isArray(data)) { setGames([]); return; }
       const todayStr = new Date().toLocaleDateString("en-CA");
       const todayGames = data.filter(g => {
