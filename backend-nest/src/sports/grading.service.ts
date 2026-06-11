@@ -97,6 +97,9 @@ export class GradingService {
     // For parlays — all legs must be final to grade
     if (bet.type === 'PARLAY' && bet.legs?.length > 0) {
       const legResults: (BetStatus | null)[] = bet.legs.map((leg: any) => {
+        // If leg already has a stored result, use it directly
+        if (leg.result === 'WON' || leg.result === 'LOST' || leg.result === 'PUSH') return leg.result as BetStatus;
+        // Otherwise try to match against live/final scores
         const sport = this.detectSport(leg.sport, leg.game, leg.pick);
         if (!sport) return null;
         const scores = scoresBySport[sport] ?? [];
