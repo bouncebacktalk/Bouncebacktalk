@@ -261,9 +261,7 @@ export class SportsDataService {
       this.fetchJson<any[]>(scoresUrl).catch(() => [] as any[]),
     ]);
 
-    if (!Array.isArray(rawOdds) || rawOdds.length === 0) return this._oddsFallback(sport);
-
-    // Build a score lookup map: game id → { homeScore, awayScore, completed, lastUpdate }
+    // Build a score lookup map: game id → { homeScore, awayScore, completed }
     const scoreMap = new Map<string, { homeScore: number | null; awayScore: number | null; completed: boolean }>();
     for (const s of (rawScores ?? [])) {
       if (!s.id) continue;
@@ -276,7 +274,35 @@ export class SportsDataService {
       });
     }
 
-    return rawOdds.map((g) => this._normalizeOddsApiGame(g, sport, scoreMap));
+    // Normalize odds games
+    const oddsGames = Array.isArray(rawOdds) && rawOdds.length > 0
+      ? rawOdds.map((g) => this._normalizeOddsApiGame(g, sport, scoreMap))
+      : [];
+
+    // Add completed games from scores that aren't already in the odds list
+    const oddsIds = new Set(oddsGames.map((g) => g.gameId));
+    const completedGames: GameOdds[] = (rawScores ?? [])
+      .filter((s: any) => s.completed && s.id && !oddsIds.has(s.id))
+      .map((s: any) => {
+        const homeEntry = (s.scores ?? []).find((sc: any) => sc.name === s.home_team);
+        const awayEntry = (s.scores ?? []).find((sc: any) => sc.name === s.away_team);
+        return {
+          gameId: s.id,
+          sport,
+          homeTeam: s.home_team,
+          awayTeam: s.away_team,
+          gameTime: s.commence_time,
+          status: 'Final',
+          homeScore: homeEntry ? Number(homeEntry.score) : null,
+          awayScore: awayEntry ? Number(awayEntry.score) : null,
+          spread: null, overUnder: null,
+          homeMoneyline: null, awayMoneyline: null,
+          sportsbooks: [],
+        };
+      });
+
+    if (oddsGames.length === 0 && completedGames.length === 0) return this._oddsFallback(sport);
+    return [...oddsGames, ...completedGames];
   }
 
   async getAllOddsToday(): Promise<{ sport: string; games: GameOdds[] }[]> {
