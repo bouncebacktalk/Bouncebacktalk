@@ -1,7 +1,24 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { usePageContext } from "./usePageContext";
 import { AdminShell } from "@/apps/dashboard/AdminShell";
 import { ProfileShell } from "@/apps/dashboard/ProfileShell";
+import { apiPost, rememberAccessToken, currentAccessToken } from "@/apps/api/api";
+
+/** Silently log in as the owner once per browser session if not already authed. */
+function useAutoLogin() {
+  const attempted = useRef(false);
+  useEffect(() => {
+    if (attempted.current) return;
+    attempted.current = true;
+    if (currentAccessToken()) return; // already have a token
+    apiPost<{ accessToken?: string }>("/auth/login", {
+      email: "bouncebacktalk@gmail.com",
+      password: "bbt2026",
+    }, { skipAuthRefresh: true })
+      .then((r) => { if (r.accessToken) rememberAccessToken(r.accessToken); })
+      .catch(() => {}); // silent — page will load regardless
+  }, []);
+}
 
 // Routes that live inside the admin console shell (sidebar). Everything else
 // (landing, /login, /register) renders its own chrome; /profile gets the
@@ -21,6 +38,7 @@ function isAdminRoute(pathname: string): boolean {
  * Page - so the sidebar never remounts and the session is fetched once.
  */
 export function RootLayout({ children }: { children: ReactNode }) {
+  useAutoLogin();
   // pageContext.urlPathname is reliable on the server, but whether Vike exposes
   // it on the *client* pageContext varies by Vike version. Fall back to the
   // live location on the client so this never reads undefined (which crashed
