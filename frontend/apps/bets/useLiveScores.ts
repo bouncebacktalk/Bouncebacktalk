@@ -186,7 +186,15 @@ export function computeLegResult(leg: BetLeg, game: LiveGame): LegResult {
     const line = parseFloat(totalMatch[2]);
     const tot  = game.homeScore + game.awayScore;
     if (tot === line) return 'push';
-    return (dir === 'over' ? tot > line : tot < line) ? 'winning' : 'losing';
+    if (game.isFinal) {
+      // Settled — definitive result
+      return (dir === 'over' ? tot > line : tot < line) ? 'winning' : 'losing';
+    }
+    // Live game: only show definitive color if already mathematically resolved
+    // Over: green only if already crossed the line (can't un-score)
+    // Under: red only if already busted (can't un-score) — otherwise neutral
+    if (dir === 'over') return tot > line ? 'winning' : null;
+    else                return tot > line ? 'losing'  : null;
   }
 
   // ── Spread / Moneyline ───────────────────────────────────────────────────

@@ -127,7 +127,10 @@ function ScoreBadge({ game, result }: { game: LiveGame; result?: LegResult }) {
   const homeNick = game.homeTeam.split(" ").pop() ?? game.homeTeamCode;
   let period = "";
   if (game.isFinal) period = `· ${game.periodLabel ?? "F"}`;
-  else if (game.isLive && game.periodLabel) period = `· ${game.periodLabel}`;
+  else if (game.isLive && game.periodLabel) {
+    period = `· ${game.periodLabel}`;
+    if (game.timeRemaining) period += ` ${game.timeRemaining}`;
+  }
 
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border ${
