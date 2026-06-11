@@ -49,9 +49,9 @@ export const authClient = {
   },
 
   async logout(): Promise<void> {
-    await apiPost<void>("/auth/logout", undefined, {
-      skipAuthRefresh: true,
-    }).finally(() => clearAccessToken());
+    // Always clear locally first — don't let a server error block the user
+    clearAccessToken();
+    apiPost<void>("/auth/logout", undefined, { skipAuthRefresh: true }).catch(() => undefined);
   },
 
   /**

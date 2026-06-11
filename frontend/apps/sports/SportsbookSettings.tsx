@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle, RefreshCw, ChevronRight, LogOut, User, Bell, Shield, BookOpen } from "lucide-react";
-import { apiGet, apiPost } from "../api/api";
+import { apiGet, apiPost, clearAccessToken } from "../api/api";
 
 const ALL_BOOKS = [
   "DraftKings", "FanDuel", "BetMGM", "Caesars", "ESPN Bet",
@@ -231,7 +231,7 @@ export function SportsbookSettings() {
 
       {/* Danger */}
       <Section title="Account">
-        <Row icon={LogOut} label="Sign Out" danger onClick={() => { window.location.href = "/auth/logout"; }} />
+        <Row icon={LogOut} label="Sign Out" danger onClick={() => { clearAccessToken(); window.location.href = "/"; }} />
       </Section>
     </div>
   );
