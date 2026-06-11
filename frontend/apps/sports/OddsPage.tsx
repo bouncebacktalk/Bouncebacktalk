@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { RefreshCw, Clock, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiGet, apiPost } from "../api/api";
+import { useLiveScores, type LiveGame } from "../bets/useLiveScores";
 
 const SPORTS = ["NBA", "NFL", "MLB", "NHL", "NCAAF", "NCAAB"];
 
@@ -22,6 +23,29 @@ interface GameOdds {
   homeMoneyline: number | null;
   awayMoneyline: number | null;
   sportsbooks: { sportsbook: string; spread: number | null; overUnder: number | null; homeMoneyline: number | null; awayMoneyline: number | null }[];
+}
+
+/** Normalize a team name for fuzzy matching */
+function normTeam(s: string) {
+  return (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Find a LiveGame that matches the odds game by team names */
+function findLiveGame(game: GameOdds, liveGames: LiveGame[]): LiveGame | null {
+  const homeN = normTeam(game.homeTeam);
+  const awayN = normTeam(game.awayTeam);
+  for (const lg of liveGames) {
+    const lgHome = normTeam(lg.homeTeam);
+    const lgAway = normTeam(lg.awayTeam);
+    // Match if home+away pair overlap (either direction)
+    if (
+      (homeN.includes(lgHome.slice(-5)) || lgHome.includes(homeN.slice(-5))) &&
+      (awayN.includes(lgAway.slice(-5)) || lgAway.includes(awayN.slice(-5)))
+    ) {
+      return lg;
+    }
+  }
+  return null;
 }
 
 function fmtOdds(n: number | null): string {
@@ -47,19 +71,35 @@ function statusColor(status: string) {
   return "text-foreground";
 }
 
-function GameCard({ game }: { game: GameOdds }) {
-  const isLive = game.status === "InProgress";
-  const isFinal = game.status === "Final";
+function GameCard({ game, liveGame }: { game: GameOdds; liveGame?: LiveGame | null }) {
+  // Prefer real-time data from our live scores backend over stale odds API data
+  const isLive = liveGame?.isLive ?? game.status === "InProgress";
+  const isFinal = liveGame?.isFinal ?? game.status === "Final";
+  const awayScore = liveGame?.awayScore ?? game.awayScore;
+  const homeScore = liveGame?.homeScore ?? game.homeScore;
+  const periodLabel = liveGame?.periodLabel ?? null;
+  const timeRemaining = liveGame?.timeRemaining ?? null;
+
+  // Period/status line shown next to LIVE badge
+  const periodLine = periodLabel
+    ? timeRemaining
+      ? `${periodLabel} · ${timeRemaining}`
+      : periodLabel
+    : null;
 
   return (
-    <Card className="bg-card border-border">
+    <Card className={`bg-card border-border transition-colors ${isLive ? "border-green-500/30" : ""}`}>
       <CardContent className="pt-4 pb-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             {isLive && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />}
             <span className={`text-xs font-medium ${statusColor(game.status)}`}>
-              {isFinal ? "FINAL" : isLive ? "LIVE" : fmtTime(game.gameTime)}
+              {isFinal
+                ? `FINAL${periodLabel ? ` · ${periodLabel}` : ""}`
+                : isLive
+                ? periodLine ? `LIVE · ${periodLine}` : "LIVE"
+                : fmtTime(game.gameTime)}
             </span>
           </div>
           <Badge variant="outline" className="text-xs text-muted-foreground border-border">
@@ -72,13 +112,23 @@ function GameCard({ game }: { game: GameOdds }) {
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground">{game.awayTeam}</span>
             {(isFinal || isLive) && (
-              <span className="text-lg font-bold text-foreground">{game.awayScore ?? "—"}</span>
+              <span className={`text-lg font-bold ${
+                isLive && awayScore != null && homeScore != null && awayScore > homeScore
+                  ? "text-green-400" : "text-foreground"
+              }`}>
+                {awayScore ?? "—"}
+              </span>
             )}
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground">{game.homeTeam}</span>
             {(isFinal || isLive) && (
-              <span className="text-lg font-bold text-foreground">{game.homeScore ?? "—"}</span>
+              <span className={`text-lg font-bold ${
+                isLive && homeScore != null && awayScore != null && homeScore > awayScore
+                  ? "text-green-400" : "text-foreground"
+              }`}>
+                {homeScore ?? "—"}
+              </span>
             )}
           </div>
         </div>
@@ -125,6 +175,7 @@ function GameCard({ game }: { game: GameOdds }) {
 export function OddsPage() {
   const [sport, setSport] = useState("NBA");
   const [games, setGames] = useState<GameOdds[]>([]);
+  const liveGames = useLiveScores();
   const [loading, setLoading] = useState(false);
   const [grading, setGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<{ graded: number; skipped: number } | null>(null);
@@ -233,7 +284,7 @@ export function OddsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {games.map((game) => (
-            <GameCard key={game.gameId} game={game} />
+            <GameCard key={game.gameId} game={game} liveGame={findLiveGame(game, liveGames)} />
           ))}
         </div>
       )}
