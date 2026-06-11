@@ -151,10 +151,16 @@ function GameCard({ game, liveGame, hasBet }: { game: GameOdds; liveGame?: LiveG
 
   const hasOdds = game.spread != null || game.homeMoneyline != null || game.overUnder != null;
 
-  // Status badge
-  let badge = { text: fmtTime(game.gameTime), color: "text-[#636366]", dot: false };
-  if (isLive)  badge = { text: [period, timeLeft].filter(Boolean).join(" · ") || "LIVE", color: "text-[#30D158]", dot: true };
-  if (isFinal) badge = { text: `Final${period ? ` · ${period}` : ""}`, color: "text-[#636366]", dot: false };
+  // Status
+  const statusLabel = isFinal
+    ? "Final"
+    : isLive ? "Live"
+    : fmtTime(game.gameTime);
+  const statusColor = isLive ? "text-[#30D158]" : "text-[#636366]";
+  // Period line: "Q3", "Top 7th", "OT", etc.
+  const periodLine = isLive
+    ? [period, timeLeft].filter(Boolean).join("  ·  ") || null
+    : isFinal && period ? period : null;
 
   // Spread display
   const awaySpread = game.spread != null ? (game.spread > 0 ? `+${game.spread}` : String(game.spread)) : null;
@@ -168,13 +174,18 @@ function GameCard({ game, liveGame, hasBet }: { game: GameOdds; liveGame?: LiveG
       <div className="px-4 pt-3 pb-3">
         {/* Status row */}
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1">
-            {badge.dot && (
-              <span className="w-1.5 h-1.5 rounded-full bg-[#30D158] animate-pulse shrink-0" />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#30D158] animate-pulse shrink-0" />}
+              <span className={`text-[9px] font-bold uppercase tracking-widest ${statusColor}`}>
+                {statusLabel}
+              </span>
+            </div>
+            {periodLine && (
+              <span className="text-[10px] font-bold text-white bg-[#2C2C2E] px-2 py-0.5 rounded-md tabular-nums">
+                {periodLine}
+              </span>
             )}
-            <span className={`text-[9px] font-bold uppercase tracking-widest ${badge.color}`}>
-              {badge.text}
-            </span>
           </div>
           {hasBet && (
             <span className="text-[9px] font-black uppercase tracking-wider text-[#E21111] bg-[#E21111]/10 px-2 py-0.5 rounded-full">
@@ -336,7 +347,16 @@ export function OddsPage() {
     setLoading(true);
     try {
       const data = await apiGet<GameOdds[]>(`/api/sports/odds?sport=${s}`);
-      setGames(Array.isArray(data) ? data : []);
+      if (!Array.isArray(data)) { setGames([]); return; }
+      // Keep only today's games (or live/final games with today's date)
+      const todayStr = new Date().toLocaleDateString("en-CA"); // "2026-06-11"
+      const todayGames = data.filter(g => {
+        try {
+          const gDate = new Date(g.gameTime).toLocaleDateString("en-CA");
+          return gDate === todayStr;
+        } catch { return false; }
+      });
+      setGames(todayGames);
       setLastRefresh(new Date());
     } catch { setGames([]); }
     finally { setLoading(false); }
@@ -354,16 +374,25 @@ export function OddsPage() {
   }
 
   const sorted = [...games].sort((a, b) => {
-    const aBet = gameHasBet(a, betTokens) ? 1 : 0;
-    const bBet = gameHasBet(b, betTokens) ? 1 : 0;
-    if (aBet !== bBet) return bBet - aBet; // bet games first
     const aLg = findLiveGame(a, liveGames), bLg = findLiveGame(b, liveGames);
     const aL = aLg?.isLive  ?? a.status === "InProgress";
     const bL = bLg?.isLive  ?? b.status === "InProgress";
     const aF = aLg?.isFinal ?? a.status === "Final";
     const bF = bLg?.isFinal ?? b.status === "Final";
+    // 1. Live games always first
     if (aL && !bL) return -1; if (!aL && bL) return 1;
-    if (aF && !bF) return 1;  if (!aF && bF) return -1;
+    // 2. Among live: bet games first
+    if (aL && bL) {
+      const aBet = gameHasBet(a, betTokens) ? 1 : 0;
+      const bBet = gameHasBet(b, betTokens) ? 1 : 0;
+      if (aBet !== bBet) return bBet - aBet;
+    }
+    // 3. Scheduled games: chronological by game time
+    if (!aL && !aF && !bL && !bF) {
+      return new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime();
+    }
+    // 4. Final games last
+    if (aF && !bF) return 1; if (!aF && bF) return -1;
     return 0;
   });
 
