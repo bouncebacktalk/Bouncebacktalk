@@ -10,7 +10,6 @@ import { OcrService } from './ocr.service';
 import { CreateBetDto, UpdateBetDto, BetFilterDto } from './dto/bets.dto';
 import { memoryStorage } from 'multer';
 
-@UseGuards(JwtAuthGuard)
 @Controller('bets')
 export class BetsController {
   constructor(
@@ -18,24 +17,27 @@ export class BetsController {
     private ocrService: OcrService,
   ) {}
 
+  // Auth temporarily bypassed — hardcoded to owner userId=1
+  private readonly OWNER_ID = 1;
+
   @Post()
-  create(@CurrentUser('id') userId: number, @Body() dto: CreateBetDto) {
-    return this.betsService.create(userId, dto);
+  create(@Body() dto: CreateBetDto) {
+    return this.betsService.create(this.OWNER_ID, dto);
   }
 
   @Get()
-  findAll(@CurrentUser('id') userId: number, @Query() filter: BetFilterDto) {
-    return this.betsService.findAll(userId, filter);
+  findAll(@Query() filter: BetFilterDto) {
+    return this.betsService.findAll(this.OWNER_ID, filter);
   }
 
   @Get('stats')
-  stats(@CurrentUser('id') userId: number) {
-    return this.betsService.getStats(userId);
+  stats() {
+    return this.betsService.getStats(this.OWNER_ID);
   }
 
   @Get(':id')
-  findOne(@CurrentUser('id') userId: number, @Param('id', ParseIntPipe) id: number) {
-    return this.betsService.findOne(userId, id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.betsService.findOne(this.OWNER_ID, id);
   }
 
   @Patch(':id')

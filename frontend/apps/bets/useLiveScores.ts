@@ -124,9 +124,9 @@ export function matchLegToGame(leg: BetLeg, games: LiveGame[]): LiveGame | null 
 
   const sport = leg.sport?.toUpperCase();
 
-  // Only match live games — never attach a final to a pending leg
+  // Match live AND final games (finals give us definitive green/red)
   const pool = games.filter((g) =>
-    (g.isLive || g.state === 'live') &&
+    (g.isLive || g.isFinal || g.state === 'live' || g.state === 'final') &&
     (sport ? g.sport?.toUpperCase() === sport : true)
   );
   if (!pool.length) return null;
@@ -190,11 +190,11 @@ export function computeLegResult(leg: BetLeg, game: LiveGame): LegResult {
       // Settled — definitive result
       return (dir === 'over' ? tot > line : tot < line) ? 'winning' : 'losing';
     }
-    // Live game: only show definitive color if already mathematically resolved
-    // Over: green only if already crossed the line (can't un-score)
-    // Under: red only if already busted (can't un-score) — otherwise neutral
+    // Live game: show direction-of-travel color
+    // Over:  green if already over the line, neutral if still under
+    // Under: green if tracking below the line, red if already busted (can't un-score)
     if (dir === 'over') return tot > line ? 'winning' : null;
-    else                return tot > line ? 'losing'  : null;
+    else                return tot > line ? 'losing' : 'winning';
   }
 
   // ── Spread / Moneyline ───────────────────────────────────────────────────
