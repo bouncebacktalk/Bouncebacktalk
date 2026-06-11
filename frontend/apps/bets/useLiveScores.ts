@@ -2,270 +2,254 @@ import { useEffect, useRef, useState } from 'react';
 import { apiGet } from '../api/api';
 import type { BetLeg } from './bets';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types (mirrors backend LiveGame) ─────────────────────────────────────────
 
-/** Mirrors backend LiveGame shape */
-export interface LiveScore {
-  gameId: string;
-  sport: 'NBA' | 'MLB' | string;
+export type GameState = 'scheduled' | 'warmup' | 'live' | 'final' | 'postponed' | 'suspended' | 'cancelled';
+
+export interface LiveGame {
+  id: string;
+  sport: string;
   homeTeam: string;
   awayTeam: string;
   homeTeamCode: string;
   awayTeamCode: string;
   homeScore: number | null;
   awayScore: number | null;
-  status: string;
+  state: GameState;
   isLive: boolean;
   isFinal: boolean;
-  /** Quarter # (NBA) or inning # (MLB) */
-  period: string | null;
-  /** Human label: "Q3", "OT", "Top 4th", "Bot 7th", "Half" */
-  periodLabel: string | null;
-  /** NBA only: "4:32" */
-  timeRemaining: string | null;
+  periodLabel: string | null;   // "Top 4th", "Bot 7th", "Q3", "OT", "Final"
+  timeRemaining: string | null; // NBA/NHL only
+  homeRecord: string | null;    // "36-28"
+  awayRecord: string | null;
   gameTime: string;
+  statusText: string;
 }
 
-export type LegStatus = 'winning' | 'losing' | 'push' | null;
+export type LegResult = 'winning' | 'losing' | 'push' | null;
 
-// ── Team name aliases ─────────────────────────────────────────────────────────
+// ── Parlay tracking ───────────────────────────────────────────────────────────
 
-/** Maps abbreviation / short name → fragments that appear in full team names */
-const ALIASES: Record<string, string[]> = {
-  // NBA
-  gsw: ['golden state', 'warriors'],
-  okc: ['oklahoma', 'thunder'],
-  lac: ['la clippers', 'clippers'],
-  lal: ['la lakers', 'lakers', 'los angeles lakers'],
-  sas: ['san antonio', 'spurs'],
-  phx: ['phoenix', 'suns'],
-  mia: ['miami', 'heat'],
-  bos: ['boston', 'celtics'],
-  nyk: ['new york', 'knicks'],
-  nyc: ['new york', 'knicks'],
-  bkn: ['brooklyn', 'nets'],
-  phi: ['philadelphia', '76ers', 'sixers'],
-  cle: ['cleveland', 'cavaliers', 'cavs'],
-  mil: ['milwaukee', 'bucks'],
-  chi: ['chicago', 'bulls'],
-  ind: ['indiana', 'pacers'],
-  det: ['detroit', 'pistons'],
-  atl: ['atlanta', 'hawks'],
-  cha: ['charlotte', 'hornets'],
-  wsh: ['washington', 'wizards'],
-  orl: ['orlando', 'magic'],
-  tor: ['toronto', 'raptors'],
-  den: ['denver', 'nuggets'],
-  min: ['minnesota', 'timberwolves', 'wolves'],
-  por: ['portland', 'trail blazers', 'blazers'],
-  uta: ['utah', 'jazz'],
-  sac: ['sacramento', 'kings'],
-  dal: ['dallas', 'mavericks', 'mavs'],
-  hou: ['houston', 'rockets'],
-  mem: ['memphis', 'grizzlies'],
-  nop: ['new orleans', 'pelicans'],
-  // MLB
-  nyy: ['new york yankees', 'yankees'],
-  nym: ['new york mets', 'mets'],
-  bos: ['boston', 'red sox'],
-  lad: ['los angeles dodgers', 'dodgers'],
-  sfg: ['san francisco', 'giants'],
-  chc: ['chicago cubs', 'cubs'],
-  cws: ['chicago white sox', 'white sox'],
-  hou_mlb: ['houston', 'astros'],
-  atl_mlb: ['atlanta', 'braves'],
-  phi_mlb: ['philadelphia', 'phillies'],
-  mia_mlb: ['miami', 'marlins'],
-  nym_mlb: ['new york', 'mets'],
-  wsh_mlb: ['washington', 'nationals'],
-  cin: ['cincinnati', 'reds'],
-  pit: ['pittsburgh', 'pirates'],
-  stl: ['st. louis', 'cardinals'],
-  mil_mlb: ['milwaukee', 'brewers'],
-  min_mlb: ['minnesota', 'twins'],
-  det_mlb: ['detroit', 'tigers'],
-  cle_mlb: ['cleveland', 'guardians'],
-  cws_mlb: ['chicago', 'white sox'],
-  kc_mlb: ['kansas city', 'royals'],
-  oak: ['oakland', 'athletics'],
-  sea: ['seattle', 'mariners'],
-  tex: ['texas', 'rangers'],
-  laa: ['los angeles angels', 'angels'],
-  col: ['colorado', 'rockies'],
-  ari: ['arizona', 'diamondbacks', 'dbacks'],
-  sd: ['san diego', 'padres'],
-  tb: ['tampa bay', 'rays'],
-  bal: ['baltimore', 'orioles'],
-  tor_mlb: ['toronto', 'blue jays'],
-};
+export interface ParlayStatus {
+  total: number;
+  won: number;
+  live: number;
+  pending: number;
+  lost: number;
+  /** 0–100 */
+  progressPct: number;
+  /** true when all legs are settled */
+  settled: boolean;
+}
 
-// ── Matching helpers ──────────────────────────────────────────────────────────
+export function getParlayStatus(legs: BetLeg[], games: LiveGame[]): ParlayStatus {
+  let won = 0, live = 0, pending = 0, lost = 0;
+  for (const leg of legs) {
+    if (leg.result === 'WON') { won++; continue; }
+    if (leg.result === 'LOST') { lost++; continue; }
+    // Unsettled — check live game
+    const game = matchLegToGame(leg, games);
+    if (game?.isLive) live++;
+    else pending++;
+  }
+  const total = legs.length;
+  const settled = won + lost === total;
+  const progressPct = total === 0 ? 0 : Math.round((won / total) * 100);
+  return { total, won, live, pending, lost, progressPct, settled };
+}
+
+// ── Team matching ─────────────────────────────────────────────────────────────
 
 function norm(s: string): string {
   return (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function teamFragments(team: string): string[] {
-  const n = norm(team);
-  // Last word is usually the nickname ("Warriors", "Yankees")
-  const words = team.toLowerCase().trim().split(/\s+/);
-  const nickname = norm(words[words.length - 1] ?? '');
-  return [n, nickname].filter(Boolean);
-}
+// Maps known abbreviations / nicknames to fragments that appear in full team names
+const TEAM_ALIASES: Record<string, string[]> = {
+  // MLB
+  nyy: ['yankees', 'new york yankees'],  nym: ['mets', 'new york mets'],
+  bos: ['red sox', 'boston'],            lad: ['dodgers', 'los angeles dodgers'],
+  sfg: ['giants', 'san francisco'],      chc: ['cubs', 'chicago cubs'],
+  cws: ['white sox', 'chicago white'],   hou: ['astros', 'houston'],
+  atl: ['braves', 'atlanta'],            phi: ['phillies', 'philadelphia'],
+  mia: ['marlins', 'miami'],             wsh: ['nationals', 'washington'],
+  cin: ['reds', 'cincinnati'],           pit: ['pirates', 'pittsburgh'],
+  stl: ['cardinals', 'st. louis', 'saint louis'],
+  mil: ['brewers', 'milwaukee'],         min: ['twins', 'minnesota'],
+  det: ['tigers', 'detroit'],            cle: ['guardians', 'cleveland'],
+  kc:  ['royals', 'kansas city'],        oak: ['athletics', 'oakland'],
+  sea: ['mariners', 'seattle'],          tex: ['rangers', 'texas'],
+  laa: ['angels', 'los angeles angels'], col: ['rockies', 'colorado'],
+  ari: ['diamondbacks', 'dbacks', 'arizona'],
+  sd:  ['padres', 'san diego'],          tb: ['rays', 'tampa bay'],
+  bal: ['orioles', 'baltimore'],         tor: ['blue jays', 'toronto'],
+  // NBA (ready for when NBA provider is added)
+  gsw: ['warriors', 'golden state'],     okc: ['thunder', 'oklahoma'],
+  lal: ['lakers', 'los angeles lakers'], lac: ['clippers'],
+  bkn: ['nets', 'brooklyn'],             nyk: ['knicks', 'new york knicks'],
+  sas: ['spurs', 'san antonio'],         phx: ['suns', 'phoenix'],
+  dal: ['mavericks', 'mavs', 'dallas'],  den: ['nuggets', 'denver'],
+};
 
-function pickMatchesTeam(pickNorm: string, teamFull: string, teamCode: string): boolean {
-  const frags = teamFragments(teamFull);
-  const codeN = norm(teamCode);
+function teamMatches(query: string, fullName: string, code: string): boolean {
+  const q = norm(query);
+  const full = norm(fullName);
+  const c = norm(code);
 
-  // Direct code match
-  if (pickNorm === codeN) return true;
-  if (pickNorm.startsWith(codeN) || codeN.startsWith(pickNorm.slice(0, 3))) return true;
+  if (q === c || full === q) return true;
+  if (full.includes(q) || q.includes(full.slice(0, 5))) return true;
+  if (c.startsWith(q.slice(0, 3)) || q.startsWith(c.slice(0, 3))) return true;
 
-  // Fragment match
-  if (frags.some((f) => pickNorm.includes(f) || f.includes(pickNorm.slice(0, 5)))) return true;
+  // Last word (nickname) match: "Yankees" matches "New York Yankees"
+  const nickname = norm(fullName.split(' ').pop() ?? '');
+  if (nickname.length > 2 && (q.includes(nickname) || nickname.includes(q.slice(0, 5)))) return true;
 
-  // Alias match
-  for (const fragments of Object.values(ALIASES)) {
-    const matchesTeam = fragments.some((f) => frags.some((tf) => tf.includes(norm(f)) || norm(f).includes(tf.slice(0, 4))));
-    const matchesPick = fragments.some((f) => pickNorm.includes(norm(f)));
-    if (matchesTeam && matchesPick) return true;
+  // Alias table
+  const aliasFrags = TEAM_ALIASES[q] ?? TEAM_ALIASES[c.toLowerCase()] ?? [];
+  if (aliasFrags.some((f) => full.includes(norm(f)))) return true;
+
+  // Check if query matches any alias key whose fragments match this team
+  for (const [, frags] of Object.entries(TEAM_ALIASES)) {
+    if (frags.some((f) => q.includes(norm(f))) && frags.some((f) => full.includes(norm(f)))) return true;
   }
   return false;
 }
 
 /**
- * Match a bet leg to a live score.
- * Uses leg.game (e.g. "LAL vs GSW"), leg.pick (e.g. "LAL -5.5"), leg.sport.
+ * Match a bet leg to a live game.
+ * Uses leg.game ("NYY vs BOS"), leg.pick ("Yankees -1.5"), leg.sport ("MLB").
  */
-export function matchLegToScore(leg: BetLeg, scores: LiveScore[]): LiveScore | null {
-  if (!scores.length) return null;
+export function matchLegToGame(leg: BetLeg, games: LiveGame[]): LiveGame | null {
+  if (!games.length) return null;
 
   const gameStr = norm(leg.game ?? '');
   const pickStr = norm(leg.pick ?? '');
-  const sportFilter = leg.sport?.toUpperCase();
+  const sport   = leg.sport?.toUpperCase();
 
-  const candidates = sportFilter
-    ? scores.filter((s) => s.sport?.toUpperCase() === sportFilter)
-    : scores;
+  const pool = sport ? games.filter((g) => g.sport?.toUpperCase() === sport) : games;
 
-  for (const score of candidates) {
-    const home = norm(score.homeTeam);
-    const away = norm(score.awayTeam);
-    const homeCode = norm(score.homeTeamCode ?? '');
-    const awayCode = norm(score.awayTeamCode ?? '');
-
-    // Match via game string (contains both team fragments)
+  for (const game of pool) {
+    // Game string must match BOTH teams
     if (gameStr.length >= 3) {
-      const homeMatch = gameStr.includes(home.slice(0, 4)) || gameStr.includes(homeCode);
-      const awayMatch = gameStr.includes(away.slice(0, 4)) || gameStr.includes(awayCode);
-      if (homeMatch && awayMatch) return score;
+      const homeInGame = teamMatches(game.homeTeamCode, game.homeTeam, game.homeTeamCode) &&
+        (gameStr.includes(norm(game.homeTeamCode)) || gameStr.includes(norm(game.homeTeam.split(' ').pop() ?? '')));
+      const awayInGame = gameStr.includes(norm(game.awayTeamCode)) || gameStr.includes(norm(game.awayTeam.split(' ').pop() ?? ''));
+      if (homeInGame && awayInGame) return game;
 
-      // nickname only ("Warriors vs Celtics")
-      const homeNick = teamFragments(score.homeTeam).find((f) => f.length > 3) ?? '';
-      const awayNick = teamFragments(score.awayTeam).find((f) => f.length > 3) ?? '';
-      if (gameStr.includes(homeNick) && gameStr.includes(awayNick)) return score;
+      // broader: game string contains 4-char fragment of each full name
+      const homeHit = gameStr.includes(norm(game.homeTeam).slice(0, 5)) || gameStr.includes(norm(game.homeTeamCode));
+      const awayHit = gameStr.includes(norm(game.awayTeam).slice(0, 5)) || gameStr.includes(norm(game.awayTeamCode));
+      if (homeHit && awayHit) return game;
     }
 
-    // Match via pick string (usually contains one team)
+    // Pick string — matches at least one team
     if (pickStr.length >= 2) {
+      // Strip line suffix (e.g. "-1.5", "+110") to isolate team name
+      const teamPart = pickStr.replace(/[+-]?\d+(\.\d+)?$/, '').trim();
+      const query = teamPart.length >= 2 ? teamPart : pickStr;
       if (
-        pickMatchesTeam(pickStr, score.homeTeam, score.homeTeamCode ?? '') ||
-        pickMatchesTeam(pickStr, score.awayTeam, score.awayTeamCode ?? '')
-      ) {
-        return score;
-      }
+        teamMatches(query, game.homeTeam, game.homeTeamCode) ||
+        teamMatches(query, game.awayTeam, game.awayTeamCode)
+      ) return game;
     }
   }
-
   return null;
 }
 
 // ── Win/loss computation ──────────────────────────────────────────────────────
 
 /**
- * Parse a bet pick and determine if the bettor is currently winning/losing.
- *
- * Supported pick formats:
- *   "LAL -5.5"     → spread: LAL gives 5.5
- *   "Warriors ML"  → moneyline on Warriors
- *   "GSW"          → moneyline on GSW
- *   "Over 224.5"   → over on total
- *   "Under 8.5"    → under on total
- *   "NYY +1.5"     → spread: NYY gets 1.5
+ * Determine if a bet leg is currently winning or losing.
+ * Works for: spread ("NYY -1.5"), moneyline ("Yankees ML"), total ("Over 8.5").
  */
-export function computeLegStatus(leg: BetLeg, score: LiveScore): LegStatus {
-  if (score.homeScore == null || score.awayScore == null) return null;
-  if (!score.isLive && !score.isFinal) return null;
+export function computeLegResult(leg: BetLeg, game: LiveGame): LegResult {
+  if (game.homeScore == null || game.awayScore == null) return null;
+  if (!game.isLive && !game.isFinal) return null;
 
-  const pickRaw = (leg.pick ?? '').trim();
-  const pickLow = pickRaw.toLowerCase();
+  const raw = (leg.pick ?? '').trim();
+  const lower = raw.toLowerCase();
 
-  // ── Total (Over/Under) ────────────────────────────────────────────────────
-  const totalMatch = pickLow.match(/^(over|under)\s*([\d.]+)/);
+  // ── Over / Under ────────────────────────────────────────────────────────
+  const totalMatch = lower.match(/^(over|under)\s*([\d.]+)/);
   if (totalMatch) {
-    const direction = totalMatch[1]; // "over" | "under"
+    const dir  = totalMatch[1];
     const line = parseFloat(totalMatch[2]);
-    const total = score.homeScore + score.awayScore;
-    if (total === line) return 'push';
-    if (direction === 'over') return total > line ? 'winning' : 'losing';
-    return total < line ? 'winning' : 'losing';
+    const tot  = game.homeScore + game.awayScore;
+    if (tot === line) return 'push';
+    return (dir === 'over' ? tot > line : tot < line) ? 'winning' : 'losing';
   }
 
-  // ── Spread or Moneyline ───────────────────────────────────────────────────
-  // Strip known suffixes like "ML", "-1h", "1st half", etc.
-  const spreadMatch = pickRaw.match(/([+-]?[\d.]+)\s*$/);
-  const spread = spreadMatch ? parseFloat(spreadMatch[1]) : null;
+  // ── Spread / Moneyline ───────────────────────────────────────────────────
+  // Extract trailing number (the line): "-1.5", "+1.5", "-110"
+  const lineMatch = raw.match(/([+-]?\d+(\.\d+)?)\s*$/);
+  const spread = lineMatch ? parseFloat(lineMatch[1]) : null;
 
-  // Determine which team the pick is on
-  const pickTeamPart = spread != null
-    ? pickRaw.slice(0, pickRaw.lastIndexOf(spreadMatch![1])).trim()
-    : pickRaw.replace(/\bml\b/i, '').trim();
+  // Team part is everything before the line
+  const teamRaw = spread != null
+    ? raw.slice(0, raw.lastIndexOf(lineMatch![0])).trim()
+    : raw.replace(/\bml\b/i, '').trim();
 
-  const pickNorm = norm(pickTeamPart || pickRaw);
+  const teamNorm = norm(teamRaw || raw);
 
-  const homeMatch = pickMatchesTeam(pickNorm, score.homeTeam, score.homeTeamCode ?? '');
-  const awayMatch = pickMatchesTeam(pickNorm, score.awayTeam, score.awayTeamCode ?? '');
+  const onHome = teamMatches(teamNorm, game.homeTeam, game.homeTeamCode);
+  const onAway = teamMatches(teamNorm, game.awayTeam, game.awayTeamCode);
+  if (!onHome && !onAway) return null;
 
-  if (!homeMatch && !awayMatch) return null;
+  const myScore  = onHome ? game.homeScore : game.awayScore;
+  const oppScore = onHome ? game.awayScore : game.homeScore;
 
-  const pickedHome = homeMatch;
-  const myScore = pickedHome ? score.homeScore : score.awayScore;
-  const oppScore = pickedHome ? score.awayScore : score.homeScore;
-
-  // Moneyline
-  if (spread == null) {
+  // Moneyline — is the spread an odds number? (> 20 = likely American odds not a spread)
+  const isOdds = spread != null && Math.abs(spread) > 20;
+  if (spread == null || isOdds) {
     if (myScore > oppScore) return 'winning';
     if (myScore < oppScore) return 'losing';
     return 'push';
   }
 
-  // Spread: positive spread means we get points added to our score
-  const adjustedMy = myScore + spread;
-  if (adjustedMy > oppScore) return 'winning';
-  if (adjustedMy < oppScore) return 'losing';
+  // Spread: positive means we get points
+  const adj = myScore + spread;
+  if (adj > oppScore) return 'winning';
+  if (adj < oppScore) return 'losing';
   return 'push';
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useLiveScores(pollMs = 60_000) {
-  const [scores, setScores] = useState<LiveScore[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+const SUPPORTED_SPORTS = new Set(['MLB']);
+const COMING_SOON_SPORTS = new Set(['NBA', 'NFL', 'NHL', 'NCAAB', 'NCAAF']);
+
+export { SUPPORTED_SPORTS, COMING_SOON_SPORTS };
+
+export function useLiveScores() {
+  const [games, setGames] = useState<LiveGame[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function load() {
     try {
-      const data = await apiGet<LiveScore[]>('/api/sports/live-scores');
-      if (Array.isArray(data)) setScores(data);
+      const data = await apiGet<LiveGame[]>('/api/sports/live-scores');
+      if (Array.isArray(data)) setGames(data);
     } catch {
       // silent — scores are best-effort
     }
   }
 
-  useEffect(() => {
-    load();
-    timerRef.current = setInterval(load, pollMs);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [pollMs]);
+  function scheduleNext(currentGames: LiveGame[]) {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const anyLive = currentGames.some((g) => g.isLive);
+    const delay = anyLive ? 15_000 : 5 * 60_000;
+    timerRef.current = setTimeout(async () => {
+      await load();
+      scheduleNext(games);
+    }, delay);
+  }
 
-  return scores;
+  useEffect(() => {
+    load().then(() => scheduleNext(games));
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
+  // Re-schedule whenever games change
+  useEffect(() => { scheduleNext(games); }, [games.some((g) => g.isLive)]);
+
+  return games;
 }

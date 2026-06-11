@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { Search, ChevronDown, Trash2, CheckCircle, Activity, TrendingUp, TrendingDown, Minus as MinusIcon } from "lucide-react";
-import { useLiveScores, matchLegToScore, computeLegStatus, type LiveScore, type LegStatus } from "./useLiveScores";
+import { Search, ChevronDown, Trash2, CheckCircle, Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  useLiveScores, matchLegToGame, computeLegResult, getParlayStatus,
+  SUPPORTED_SPORTS, COMING_SOON_SPORTS,
+  type LiveGame, type LegResult,
+} from "./useLiveScores";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,10 +107,6 @@ function SettleDialog({
   );
 }
 
-// ── Supported sports for live tracking ───────────────────────────────────────
-const LIVE_SPORTS = new Set(["NBA", "MLB"]);
-const COMING_SOON_SPORTS = new Set(["NFL", "NHL", "NCAAF", "NCAAB"]);
-
 function ComingSoonBadge({ sport }: { sport?: string }) {
   if (!sport) return null;
   const upper = sport.toUpperCase();
@@ -118,50 +118,51 @@ function ComingSoonBadge({ sport }: { sport?: string }) {
   );
 }
 
-function ScoreBadge({ score, legStatus }: { score: LiveScore; legStatus?: LegStatus }) {
-  if (score.homeScore == null && score.awayScore == null) return null;
+function ScoreBadge({ game, result }: { game: LiveGame; result?: LegResult }) {
+  if (game.homeScore == null && game.awayScore == null) return null;
 
-  const awayNick = score.awayTeam.split(" ").pop() ?? score.awayTeamCode;
-  const homeNick = score.homeTeam.split(" ").pop() ?? score.homeTeamCode;
+  const awayNick = game.awayTeam.split(" ").pop() ?? game.awayTeamCode;
+  const homeNick = game.homeTeam.split(" ").pop() ?? game.homeTeamCode;
 
-  // Period label: "Q3 4:32", "OT", "Top 4th", "Final", etc.
   let periodText = "";
-  if (score.isFinal) {
-    periodText = " · F";
-  } else if (score.isLive && score.periodLabel) {
-    periodText = ` · ${score.periodLabel}`;
-    if (score.timeRemaining) periodText += ` ${score.timeRemaining}`;
+  if (game.isFinal) {
+    periodText = ` · ${game.periodLabel ?? "F"}`;
+  } else if (game.isLive && game.periodLabel) {
+    periodText = ` · ${game.periodLabel}`;
+    if (game.timeRemaining) periodText += ` ${game.timeRemaining}`;
   }
 
-  const statusColors: Record<NonNullable<LegStatus>, string> = {
+  const statusColors: Record<NonNullable<LegResult>, string> = {
     winning: "bg-green-500/15 text-green-400 border-green-500/30",
-    losing:  "bg-red-500/15  text-red-400  border-red-500/30",
+    losing:  "bg-red-500/15 text-red-400 border-red-500/30",
     push:    "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
   };
 
-  const baseClass = score.isLive
-    ? (legStatus ? statusColors[legStatus] : "bg-green-500/15 text-green-400 border-green-500/30")
+  const baseClass = game.isLive
+    ? (result ? statusColors[result] : "bg-blue-500/15 text-blue-400 border-blue-500/30")
     : "bg-muted/60 text-muted-foreground border-border";
 
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${baseClass}`}>
-      {score.isLive && (
-        <span className={`size-1.5 rounded-full inline-block animate-pulse ${legStatus === "winning" ? "bg-green-400" : legStatus === "losing" ? "bg-red-400" : "bg-green-400"}`} />
+      {game.isLive && (
+        <span className={`size-1.5 rounded-full inline-block animate-pulse ${
+          result === "winning" ? "bg-green-400" : result === "losing" ? "bg-red-400" : "bg-blue-400"
+        }`} />
       )}
-      {awayNick} {score.awayScore} @ {homeNick} {score.homeScore}
+      {awayNick} {game.awayScore} @ {homeNick} {game.homeScore}
       <span className="opacity-60">{periodText}</span>
     </span>
   );
 }
 
-function LegStatusIcon({ status }: { status: LegStatus }) {
+function LegStatusIcon({ status }: { status: LegResult }) {
   if (!status) return null;
   if (status === "winning") return <TrendingUp className="size-3 text-green-400 shrink-0" />;
   if (status === "losing")  return <TrendingDown className="size-3 text-red-400 shrink-0" />;
-  return <MinusIcon className="size-3 text-yellow-400 shrink-0" />;
+  return <Minus className="size-3 text-yellow-400 shrink-0" />;
 }
 
-function BetRow({ bet, onRefresh, liveScores }: { bet: Bet; onRefresh: () => void; liveScores: LiveScore[] }) {
+function BetRow({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => void; liveGames: LiveGame[] }) {
   const [expanded, setExpanded] = useState(false);
   const [settling, setSettling] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -234,20 +235,32 @@ function BetRow({ bet, onRefresh, liveScores }: { bet: Bet; onRefresh: () => voi
         {expanded && (
           <div className="px-4 pb-4 space-y-3 bg-muted/20">
             {/* Parlay progress bar */}
-            {bet.type === "PARLAY" && bet.status === "PENDING" && bet.legs.length > 0 && (() => {
-              const won = bet.legs.filter(l => l.result === "WON").length;
-              const lost = bet.legs.filter(l => l.result === "LOST").length;
-              const total = bet.legs.length;
-              if (won + lost === 0) return null;
+            {bet.type === "PARLAY" && bet.legs.length > 1 && (() => {
+              const ps = getParlayStatus(bet.legs, liveGames);
               return (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span className="flex items-center gap-1"><Activity className="size-3" /> Parlay progress</span>
-                    <span>{won}/{total} legs hit{lost > 0 ? ` · ${lost} lost` : ""}</span>
+                    <span className="flex items-center gap-1">
+                      <Activity className="size-3" /> Parlay progress
+                    </span>
+                    <span className="font-mono">
+                      {ps.won}W · {ps.live > 0 ? `${ps.live} live · ` : ""}{ps.pending} pending · {ps.lost}L
+                    </span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden flex">
-                    <div className="bg-green-500 h-full transition-all" style={{ width: `${(won / total) * 100}%` }} />
-                    <div className="bg-red-500 h-full transition-all" style={{ width: `${(lost / total) * 100}%` }} />
+                  {/* Progress bar: green=won, blue=live, red=lost, gray=pending */}
+                  <div className="h-2 rounded-full bg-muted overflow-hidden flex gap-px">
+                    {ps.won > 0 && (
+                      <div className="bg-green-500 h-full transition-all rounded-l-full"
+                        style={{ width: `${(ps.won / ps.total) * 100}%` }} />
+                    )}
+                    {ps.live > 0 && (
+                      <div className="bg-blue-500 h-full transition-all animate-pulse"
+                        style={{ width: `${(ps.live / ps.total) * 100}%` }} />
+                    )}
+                    {ps.lost > 0 && (
+                      <div className="bg-red-500 h-full transition-all"
+                        style={{ width: `${(ps.lost / ps.total) * 100}%` }} />
+                    )}
                   </div>
                 </div>
               );
@@ -255,77 +268,73 @@ function BetRow({ bet, onRefresh, liveScores }: { bet: Bet; onRefresh: () => voi
 
             {/* Legs */}
             {bet.legs.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {bet.legs.map((leg, i) => {
                   const isPending = bet.status === "PENDING";
-                  const score = isPending ? matchLegToScore(leg, liveScores) : null;
-                  const legStatus = score ? computeLegStatus(leg, score) : null;
-                  const isLiveGame = score?.isLive ?? false;
+                  const game = isPending ? matchLegToGame(leg, liveGames) : null;
+                  const result = game ? computeLegResult(leg, game) : null;
+                  const isLive = game?.isLive ?? false;
                   const sportUpper = (leg.sport ?? "").toUpperCase();
-                  const unsupported = COMING_SOON_SPORTS.has(sportUpper);
+                  const comingSoon = COMING_SOON_SPORTS.has(sportUpper);
 
                   return (
                     <div
                       key={leg.id}
-                      className={`flex flex-col gap-1 text-xs rounded px-2.5 py-2 border transition-colors ${
-                        isLiveGame && legStatus === "winning"
-                          ? "bg-green-500/5 border-green-500/20"
-                          : isLiveGame && legStatus === "losing"
-                          ? "bg-red-500/5 border-red-500/20"
-                          : "bg-muted border-transparent"
+                      className={`flex flex-col gap-1.5 text-xs rounded-md px-2.5 py-2 border transition-colors ${
+                        isLive && result === "winning"
+                          ? "bg-green-500/5 border-green-500/25"
+                          : isLive && result === "losing"
+                          ? "bg-red-500/5 border-red-500/25"
+                          : isLive
+                          ? "bg-blue-500/5 border-blue-500/20"
+                          : "bg-muted/50 border-transparent"
                       }`}
                     >
+                      {/* Leg header row */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-muted-foreground w-4 shrink-0">{i + 1}.</span>
+                        <span className="text-muted-foreground w-4 shrink-0 text-[10px]">{i + 1}.</span>
                         <span className="font-medium text-foreground">{leg.pick ?? "—"}</span>
                         {leg.line && <span className="text-muted-foreground">{leg.line}</span>}
                         {leg.sport && (
-                          <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
                             {leg.sport}
                           </span>
                         )}
-
                         <div className="ml-auto flex items-center gap-1.5">
-                          {/* Live win/loss icon */}
-                          {isLiveGame && isPending && <LegStatusIcon status={legStatus} />}
-
-                          {leg.odds && (
-                            <span className="font-mono text-muted-foreground">
+                          {isLive && isPending && <LegStatusIcon status={result} />}
+                          {leg.odds != null && (
+                            <span className="font-mono text-muted-foreground text-[11px]">
                               {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
                             </span>
                           )}
                           {leg.result && (
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] ${statusBg(leg.result as BetStatus)}`}
-                            >
+                            <Badge variant="outline" className={`text-[10px] ${statusBg(leg.result as BetStatus)}`}>
                               {leg.result}
                             </Badge>
                           )}
                         </div>
                       </div>
 
-                      {/* Live score row */}
-                      {score && (
-                        <div className="pl-6 flex items-center gap-2 flex-wrap">
-                          <ScoreBadge score={score} legStatus={legStatus} />
-                          {isLiveGame && legStatus && (
-                            <span className={`text-[10px] font-semibold ${
-                              legStatus === "winning" ? "text-green-400" :
-                              legStatus === "losing"  ? "text-red-400"   :
+                      {/* Live score */}
+                      {game && (
+                        <div className="pl-5 flex items-center gap-2 flex-wrap">
+                          <ScoreBadge game={game} result={result} />
+                          {isLive && result && (
+                            <span className={`text-[10px] font-bold tracking-wide ${
+                              result === "winning" ? "text-green-400" :
+                              result === "losing"  ? "text-red-400"   :
                               "text-yellow-400"
                             }`}>
-                              {legStatus === "winning" ? "▲ Winning" :
-                               legStatus === "losing"  ? "▼ Losing"  :
-                               "= Push"}
+                              {result === "winning" ? "▲ WINNING" :
+                               result === "losing"  ? "▼ LOSING"  : "= PUSH"}
                             </span>
                           )}
                         </div>
                       )}
 
-                      {/* Coming soon notice for unsupported sports */}
-                      {isPending && unsupported && (
-                        <div className="pl-6">
+                      {/* Coming soon */}
+                      {isPending && !game && comingSoon && (
+                        <div className="pl-5">
                           <ComingSoonBadge sport={leg.sport} />
                         </div>
                       )}
@@ -371,7 +380,7 @@ function BetRow({ bet, onRefresh, liveScores }: { bet: Bet; onRefresh: () => voi
 }
 
 export function BetHistory() {
-  const liveScores = useLiveScores(60_000);
+  const liveGames = useLiveScores();
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -504,7 +513,7 @@ export function BetHistory() {
           ) : (
             <>
               {bets.map((bet) => (
-                <BetRow key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveScores={liveScores} />
+                <BetRow key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveGames={liveGames} />
               ))}
               {hasMore && (
                 <div className="p-4 text-center border-t border-border">

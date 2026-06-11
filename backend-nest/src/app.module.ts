@@ -14,6 +14,7 @@ import { PrismaModule } from "./prisma";
 import { QueueModule } from "./queue";
 import { UsersModule } from "./users";
 import { SportsModule } from "./sports/sports.module";
+import { LiveScoresModule } from "./live-scores/live-scores.module";
 
 // EmailModule is always loaded because the default `console` transport
 // requires no setup and the rest of the app (auth password-reset, future
@@ -33,6 +34,7 @@ import { SportsModule } from "./sports/sports.module";
     LeadsModule,
     BetsModule,
     SportsModule,
+    LiveScoresModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

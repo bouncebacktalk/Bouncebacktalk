@@ -4,6 +4,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { SportsDataService } from './sports-data.service';
 import { GradingService } from './grading.service';
 import { PreferencesService } from './preferences.service';
+import { LiveScoresService } from '../live-scores/live-scores.service';
+import type { Sport } from '../live-scores/live-score.types';
 
 @Controller('sports')
 export class SportsController {
@@ -11,20 +13,27 @@ export class SportsController {
     private sportsData: SportsDataService,
     private grading: GradingService,
     private prefs: PreferencesService,
+    private liveScores: LiveScoresService,
   ) {}
 
-  // ── Public endpoints (no auth required) ────────────────────────────────────
+  // ── Public — no auth required ──────────────────────────────────────────────
 
-  /** GET /api/sports/live-scores — NBA + MLB live games, 60s cached */
+  /**
+   * GET /api/sports/live-scores
+   * Returns LiveGame[] for all registered sports (currently MLB).
+   * Polled every 15s when games are live, 5min otherwise.
+   * Optional ?sport=MLB to filter by sport.
+   */
   @Get('live-scores')
-  getLiveScores(@Query('date') date?: string) {
-    return this.sportsData.getAllLiveGamesToday(date);
+  getLiveScores(@Query('sport') sport?: string) {
+    if (sport) return this.liveScores.getBySport(sport.toUpperCase() as Sport);
+    return this.liveScores.getAll();
   }
 
   /** GET /api/sports/live-scores/status */
   @Get('live-scores/status')
   getLiveScoresStatus() {
-    return { supported: ['NBA', 'MLB'], comingSoon: ['NFL', 'NHL', 'NCAAF', 'NCAAB'] };
+    return this.liveScores.getSupportedSports();
   }
 
   /** GET /api/sports/odds?sport=NBA */
@@ -40,13 +49,20 @@ export class SportsController {
     return this.sportsData.getScoresByDate(sport, date);
   }
 
-  // ── Auth-required endpoints ────────────────────────────────────────────────
+  // ── Auth-required ──────────────────────────────────────────────────────────
 
   /** POST /api/sports/grade — manual trigger */
   @UseGuards(JwtAuthGuard)
   @Post('grade')
   gradeNow() {
     return this.grading.gradePendingBets();
+  }
+
+  /** POST /api/sports/refresh — force re-fetch from providers */
+  @UseGuards(JwtAuthGuard)
+  @Post('refresh')
+  refreshScores(@Query('sport') sport?: string) {
+    return this.liveScores.refresh(sport as Sport | undefined);
   }
 
   /** GET /api/sports/preferences */

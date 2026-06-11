@@ -54,6 +54,7 @@ export interface StatsResponse {
 
 export interface CreateBetPayload {
   type: BetType;
+  status?: BetStatus;
   sportsbook?: string;
   stake: number;
   odds: number;
