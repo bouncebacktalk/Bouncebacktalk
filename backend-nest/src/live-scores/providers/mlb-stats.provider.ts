@@ -86,7 +86,7 @@ function parseGame(g: any): LiveGame {
     isLive,
     isFinal,
     periodLabel,
-    timeRemaining: null, // MLB has no clock
+    timeRemaining: null,
     homeRecord: homeW != null ? `${homeW}-${homeL}` : null,
     awayRecord:  awayW != null ? `${awayW}-${awayL}` : null,
     gameTime: g.gameDate ?? '',
