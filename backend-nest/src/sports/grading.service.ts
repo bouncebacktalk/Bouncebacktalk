@@ -105,8 +105,8 @@ export class GradingService {
         return this.gradeStraitLeg(leg, game);
       });
 
-      if (legResults.some((r) => r === null)) return null; // not all settled
-      if (legResults.some((r) => r === 'LOST')) return 'LOST';
+      if (legResults.some((r) => r === 'LOST')) return 'LOST'; // one loss kills the parlay immediately
+      if (legResults.some((r) => r === null)) return null; // still waiting on other games
       if (legResults.every((r) => r === 'WON')) return 'WON';
       if (legResults.some((r) => r === 'PUSH')) return 'PUSH';
       return null;
