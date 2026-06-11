@@ -313,13 +313,16 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
                     }
                   }
 
-                  // Color: NEUTRAL grey while live, only green/red/grey when fully settled
+                  // Color: mathematically green/red/grey while live, definitive when settled
                   const barColor = settled
                     ? leg.result === "WON"  ? "bg-[#30D158]"
                     : leg.result === "LOST" ? "bg-[#E21111]"
-                    : "bg-[#636366]"        // PUSH or VOID → grey
-                    : isLive ? "bg-[#48484A]"   // always neutral while in progress
-                    : "bg-[#2C2C2E]";           // not started yet
+                    : "bg-[#636366]"                         // PUSH or VOID → grey
+                    : isLive
+                    ? result === "winning" ? "bg-[#30D158]"  // currently hitting → green
+                    : result === "losing"  ? "bg-[#E21111]"  // currently missing → red
+                    : "bg-[#48484A]"                         // tied / can't tell → neutral
+                    : "bg-[#2C2C2E]";                        // not started yet
 
                   const barWidth = `${barPct}%`;
 
