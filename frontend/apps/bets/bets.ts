@@ -105,7 +105,7 @@ export const betsApi = {
   update: (id: number, data: Partial<CreateBetPayload> & { status?: BetStatus }) =>
     apiRequest<Bet>(`/api/bets/${id}`, { method: 'PATCH', body: data }),
 
-  remove: (id: number) => apiRequest<void>(`/api/bets/${id}`),
+  remove: (id: number) => apiRequest<void>(`/api/bets/${id}`, { method: 'DELETE' }),
 
   stats: () => apiRequest<StatsResponse>('/api/bets/stats'),
 
