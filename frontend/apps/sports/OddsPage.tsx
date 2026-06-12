@@ -148,15 +148,19 @@ function liveGameToGameOdds(game: LiveGame): GameOdds {
 
 function uniqueGames(games: GameOdds[]): GameOdds[] {
   const seen = new Set<string>();
+
   return games.filter((game) => {
-    const gameId = game.gameId ? `${game.sport}:${game.gameId}` : "";
     const day = game.gameTime
       ? new Date(game.gameTime).toLocaleDateString("en-CA")
       : "";
-    const key = gameId || [
+
+    const teams = [normTeam(game.awayTeam), normTeam(game.homeTeam)]
+      .sort()
+      .join("vs");
+
+    const key = [
       game.sport?.toUpperCase(),
-      normTeam(game.awayTeam),
-      normTeam(game.homeTeam),
+      teams,
       day,
     ].join(":");
 
