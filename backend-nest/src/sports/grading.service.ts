@@ -117,10 +117,10 @@ export class GradingService {
 
     for (const bet of pendingBets) {
       try {
-        const graded = this.gradeBetDetailed(bet, scoresBySportDate);
-        if (!graded?.status) { skipped++; continue; }
+        const gradedBet = this.gradeBetDetailed(bet, scoresBySportDate);
+        if (!gradedBet?.status) { skipped++; continue; }
 
-        const result = graded.status;
+        const result = gradedBet.status;
         const profit = this.calculateProfit(bet.stake, bet.payout, result);
         await this.prisma.bet.update({
           where: { id: bet.id },
@@ -129,7 +129,7 @@ export class GradingService {
             profit,
             settledAt: new Date(),
             legs: {
-              update: graded.legs.map((leg: any) => ({
+              update: gradedBet.legs.map((leg: any) => ({
                 where: { id: leg.id },
                 data: { result: leg.result },
               })),
@@ -184,7 +184,7 @@ export class GradingService {
         return { id: leg.id, result: this.gradeStraitLeg(leg, game) };
       });
 
-      const legResults = gradedLegs.map((leg: any) => leg.result);
+      const legResults: (BetStatus | null)[] = gradedLegs.map((leg: any) => leg.result);
 
       if (legResults.some((r) => r === 'LOST')) return { status: 'LOST', legs: gradedLegs };
       if (legResults.some((r) => r === null)) return { status: null, legs: gradedLegs };
