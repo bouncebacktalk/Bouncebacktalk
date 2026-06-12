@@ -102,7 +102,6 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
   const [deleting, setDeleting] = useState(false);
 
   async function deleteBet() {
-    if (!confirm("Delete this bet?")) return;
     setDeleting(true);
     try { await betsApi.remove(bet.id); onRefresh(); }
     catch { setDeleting(false); }
