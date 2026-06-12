@@ -117,9 +117,10 @@ export class GradingService {
 
     for (const bet of pendingBets) {
       try {
-        const result = this.gradeBet(bet, scoresBySportDate);
-        if (!result) { skipped++; continue; }
+        const graded = this.gradeBetDetailed(bet, scoresBySportDate);
+        if (!graded?.status) { skipped++; continue; }
 
+        const result = graded.status;
         const profit = this.calculateProfit(bet.stake, bet.payout, result);
         await this.prisma.bet.update({
           where: { id: bet.id },
@@ -127,6 +128,12 @@ export class GradingService {
             status: result,
             profit,
             settledAt: new Date(),
+            legs: {
+              update: graded.legs.map((leg: any) => ({
+                where: { id: leg.id },
+                data: { result: leg.result },
+              })),
+            },
           },
         });
         graded++;
@@ -151,7 +158,7 @@ export class GradingService {
     });
   }
 
-  private gradeBet(bet: any, scoresBySportDate: Record<string, any[]>): BetStatus | null {
+  private gradeBetDetailed(bet: any, scoresBySportDate: Record<string, any[]>): { status: BetStatus | null; legs: { id: number; result: BetStatus | null }[] } | null {
     const betDate = this.dateKey(bet.betDate);
 
     // For straight bets with a single leg, try to match to a game result
@@ -160,25 +167,30 @@ export class GradingService {
       const game = this.findGameForLeg(leg, betDate, scoresBySportDate);
       if (!game || game.status !== 'Final') return null;
 
-      return this.gradeStraitLeg(leg, game);
+      const result = this.gradeStraitLeg(leg, game);
+      return { status: result, legs: [{ id: leg.id, result }] };
     }
 
     // For parlays — all legs must be final to grade
     if (bet.type === 'PARLAY' && bet.legs?.length > 0) {
-      const legResults: (BetStatus | null)[] = bet.legs.map((leg: any) => {
-        // If leg already has a stored result, use it directly
-        if (leg.result === 'WON' || leg.result === 'LOST' || leg.result === 'PUSH') return leg.result as BetStatus;
-        // Otherwise try to match against live/final scores
+      const gradedLegs = bet.legs.map((leg: any) => {
+        if (leg.result === 'WON' || leg.result === 'LOST' || leg.result === 'PUSH') {
+          return { id: leg.id, result: leg.result as BetStatus };
+        }
+
         const game = this.findGameForLeg(leg, betDate, scoresBySportDate);
-        if (!game || game.status !== 'Final') return null;
-        return this.gradeStraitLeg(leg, game);
+        if (!game || game.status !== 'Final') return { id: leg.id, result: null };
+
+        return { id: leg.id, result: this.gradeStraitLeg(leg, game) };
       });
 
-      if (legResults.some((r) => r === 'LOST')) return 'LOST'; // one loss kills the parlay immediately
-      if (legResults.some((r) => r === null)) return null; // still waiting on other games
-      if (legResults.every((r) => r === 'WON')) return 'WON';
-      if (legResults.some((r) => r === 'PUSH')) return 'PUSH';
-      return null;
+      const legResults = gradedLegs.map((leg: any) => leg.result);
+
+      if (legResults.some((r) => r === 'LOST')) return { status: 'LOST', legs: gradedLegs };
+      if (legResults.some((r) => r === null)) return { status: null, legs: gradedLegs };
+      if (legResults.every((r) => r === 'WON')) return { status: 'WON', legs: gradedLegs };
+      if (legResults.some((r) => r === 'PUSH')) return { status: 'PUSH', legs: gradedLegs };
+      return { status: null, legs: gradedLegs };
     }
 
     return null;
