@@ -150,9 +150,15 @@ function liveGameToGameOdds(game: LiveGame): GameOdds {
 }
 
 function uniqueGames(games: GameOdds[]): GameOdds[] {
-  const seen = new Set<string>();
+  const byMatchup = new Map<string, GameOdds>();
 
-  return games.filter((game) => {
+  const rank = (game: GameOdds) => {
+    if (game.status === "InProgress") return 3;
+    if (game.status === "Final") return 2;
+    return 1;
+  };
+
+  for (const game of games) {
     const day = game.gameTime
       ? new Date(game.gameTime).toLocaleDateString("en-CA")
       : "";
@@ -167,10 +173,14 @@ function uniqueGames(games: GameOdds[]): GameOdds[] {
       day,
     ].join(":");
 
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+    const existing = byMatchup.get(key);
+
+    if (!existing || rank(game) > rank(existing)) {
+      byMatchup.set(key, game);
+    }
+  }
+
+  return Array.from(byMatchup.values());
 }
 
 function isTodayGame(gameTime: string): boolean {
