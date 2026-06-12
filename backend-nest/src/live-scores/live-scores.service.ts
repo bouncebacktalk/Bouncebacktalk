@@ -10,6 +10,35 @@ function todayPT(): string {
   // Use Pacific time so the date rolls at midnight PT, matching the US sports day
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
 }
+function normTeam(s: string) {
+  return (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function dedupeLiveGames(games: LiveGame[]): LiveGame[] {
+  const byMatchup = new Map<string, LiveGame>();
+
+  const rank = (g: LiveGame) => g.isLive ? 3 : g.isFinal ? 2 : 1;
+
+  for (const game of games) {
+    const day = game.gameTime
+      ? new Date(game.gameTime).toLocaleDateString('en-CA')
+      : '';
+
+    const teams = [normTeam(game.awayTeam), normTeam(game.homeTeam)]
+      .sort()
+      .join('vs');
+
+    const key = [game.sport, teams, day].join(':');
+    const existing = byMatchup.get(key);
+
+    if (!existing || rank(game) > rank(existing)) {
+      byMatchup.set(key, game);
+    }
+  }
+
+  return Array.from(byMatchup.values());
+}
+
 
 @Injectable()
 export class LiveScoresService implements OnModuleInit, OnModuleDestroy {
@@ -75,14 +104,14 @@ export class LiveScoresService implements OnModuleInit, OnModuleDestroy {
   getAll(): LiveGame[] {
     const out: LiveGame[] = [];
     for (const cached of this.cache.values()) {
-      out.push(...cached.games);
+      out.push(...dedupeLiveGames(cached.games));
     }
     return out;
   }
 
   /** Games for a specific sport today */
   getBySport(sport: Sport): LiveGame[] {
-    return this.cache.get(sport)?.games ?? [];
+    return dedupeLiveGames(this.cache.get(sport)?.games ?? []);
   }
 
   /** Force a refresh for a specific sport (used by tests / manual trigger) */
