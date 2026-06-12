@@ -232,7 +232,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
                   // Compute fill percentage — purely how far along we are, NO win/loss color while live
                   let barPct = 0;
-                  if (settled) {
+                  if (settled || bet.status === "LOST") {
                     barPct = 100;
                   } else if (isLive && game) {
                     if (isTotal && totalLine && totalLine > 0) {
