@@ -10,6 +10,7 @@ export class OcrService {
     odds?: number;
     payout?: number;
     betType?: string;
+    betDate?: string | null;
     legs?: Array<{ pick?: string; odds?: number; betType?: string; game?: string; sport?: string; league?: string }>;
     raw?: string;
     error?: string;
@@ -119,11 +120,59 @@ Rules:
         parsed.legs = [{ pick: null, odds: parsed.odds, betType: null, game: null }];
       }
 
+      parsed.betDate = this.normalizeBetDate(parsed.betDate);
+
       this.logger.log(`OCR success: ${parsed.betType}, ${parsed.legs?.length} legs, stake=$${parsed.stake}`);
       return { ...parsed, raw };
     } catch (err: any) {
       this.logger.error('OCR failed', err?.message ?? err);
       return { error: 'PARSE_ERROR' };
     }
+  }
+
+  private normalizeBetDate(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    let year: number;
+    let month: number;
+    let day: number;
+
+    const iso = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    const us = trimmed.match(/^(\d{1,2})[-/](\d{1,2})(?:[-/](\d{2,4}))?/);
+
+    if (iso) {
+      year = Number(iso[1]);
+      month = Number(iso[2]);
+      day = Number(iso[3]);
+    } else if (us) {
+      month = Number(us[1]);
+      day = Number(us[2]);
+      year = us[3] ? Number(us[3]) : currentYear;
+      if (year < 100) year += 2000;
+    } else {
+      const parsed = new Date(trimmed);
+      if (Number.isNaN(parsed.getTime())) return null;
+      year = parsed.getFullYear();
+      month = parsed.getMonth() + 1;
+      day = parsed.getDate();
+    }
+
+    if (year < currentYear - 1 || year > currentYear + 1) return null;
+
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return null;
+    }
+
+    return date.toISOString().slice(0, 10);
   }
 }
