@@ -124,6 +124,25 @@ function liveGameToGameOdds(game: LiveGame): GameOdds {
   };
 }
 
+function uniqueGames(games: GameOdds[]): GameOdds[] {
+  const seen = new Set<string>();
+  return games.filter((game) => {
+    const day = game.gameTime
+      ? new Date(game.gameTime).toLocaleDateString("en-CA")
+      : "";
+    const key = [
+      game.sport?.toUpperCase(),
+      normTeam(game.awayTeam),
+      normTeam(game.homeTeam),
+      day,
+    ].join(":");
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ── Logo with fallback initials ───────────────────────────────────────────────
 function Logo({ sport, name, size = 44 }: { sport: string; name: string; size?: number }) {
   const [err, setErr] = useState(false);
@@ -425,7 +444,7 @@ export function OddsPage() {
       .filter((game) => game.sport?.toUpperCase() === sport)
       .map(liveGameToGameOdds);
 
-  const displayGames = games.length > 0 ? games : fallbackGames;
+  const displayGames = uniqueGames(games.length > 0 ? games : fallbackGames);
 
   const sorted = [...displayGames].sort((a, b) => {
     const aLg = findLiveGame(a, liveGames), bLg = findLiveGame(b, liveGames);
