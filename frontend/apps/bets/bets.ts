@@ -81,7 +81,16 @@ export interface OcrResult {
   betType?: string;
   status?: BetStatus;
   betDate?: string;
-  legs?: Array<{ pick?: string; odds?: number; betType?: string; game?: string; result?: BetStatus }>;
+  legs?: Array<{
+    pick?: string;
+    odds?: number;
+    betType?: string;
+    game?: string;
+    sport?: string;
+    league?: string;
+    line?: string;
+    result?: BetStatus;
+  }>;
 }
 
 export const betsApi = {
@@ -96,7 +105,7 @@ export const betsApi = {
   update: (id: number, data: Partial<CreateBetPayload> & { status?: BetStatus }) =>
     apiRequest<Bet>(`/api/bets/${id}`, { method: 'PATCH', body: data }),
 
-  remove: (id: number) => apiRequest<void>(`/api/bets/${id}`, { method: 'DELETE' }),
+  remove: (id: number) => apiRequest<void>(`/api/bets/${id}`),
 
   stats: () => apiRequest<StatsResponse>('/api/bets/stats'),
 
