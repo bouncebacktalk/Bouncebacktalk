@@ -84,14 +84,36 @@ function getLogoUrl(sport: string, team: string) {
   return `https://a.espncdn.com/i/teamlogos/${sport.toLowerCase()}/500/${abbr}.png`;
 }
 
-function normTeam(s: string) { return (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+function normTeam(s: string) {
+  return (s ?? "")
+    .toLowerCase()
+    .replace(/\b(fc|sc|club|the)\b/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function teamsMatch(a: string, b: string) {
+  const aN = normTeam(a);
+  const bN = normTeam(b);
+
+  if (!aN || !bN) return false;
+  if (aN === bN) return true;
+
+  return aN.length >= 8 && bN.length >= 8 && (aN.includes(bN) || bN.includes(aN));
+}
+
 function findLiveGame(game: GameOdds, liveGames: LiveGame[]): LiveGame | null {
-  const hN = normTeam(game.homeTeam), aN = normTeam(game.awayTeam);
   for (const lg of liveGames) {
-    const lhN = normTeam(lg.homeTeam), laN = normTeam(lg.awayTeam);
-    if ((hN.includes(lhN.slice(-5)) || lhN.includes(hN.slice(-5))) &&
-        (aN.includes(laN.slice(-5)) || laN.includes(aN.slice(-5)))) return lg;
+    const sameOrder =
+      teamsMatch(game.homeTeam, lg.homeTeam) &&
+      teamsMatch(game.awayTeam, lg.awayTeam);
+
+    const flippedOrder =
+      teamsMatch(game.homeTeam, lg.awayTeam) &&
+      teamsMatch(game.awayTeam, lg.homeTeam);
+
+    if (sameOrder || flippedOrder) return lg;
   }
+
   return null;
 }
 function fmtML(n: number | null) { return n == null ? "—" : n > 0 ? `+${n}` : String(n); }
@@ -430,31 +452,6 @@ export function OddsPage() {
     setLoading(true);
     try {
       const data = await apiGet<GameOdds[]>(`/api/sports/odds?sport=${s}`);
-
-      if (s === "MLB" && (!Array.isArray(data) || data.length === 0)) {
-        const live = await apiGet<LiveGame[]>("/api/sports/live-scores");
-        const fallbackGames = live
-          .filter(g => g.sport === "MLB")
-          .map(g => ({
-            gameId: g.id,
-            sport: "MLB",
-            homeTeam: g.homeTeam,
-            awayTeam: g.awayTeam,
-            homeScore: g.homeScore,
-            awayScore: g.awayScore,
-            gameTime: g.gameTime,
-            status: g.isLive ? "InProgress" : g.isFinal ? "Final" : "Scheduled",
-            spread: null,
-            homeMoneyline: null,
-            awayMoneyline: null,
-            overUnder: null
-          }));
-
-        setGames(fallbackGames as any);
-        setLastRefresh(new Date());
-        return;
-      }
-
       if (!Array.isArray(data)) { setGames([]); return; }
       const todayStr = new Date().toLocaleDateString("en-CA");
       const todayGames = data.filter(g => {
@@ -573,14 +570,33 @@ export function OddsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {sorted.map(game => (
-            <GameCard
-              key={game.gameId}
-              game={game}
-              liveGame={findLiveGame(game, liveGames)}
-              hasBet={gameHasBet(game, betTokens)}
-            />
-          ))}
+          {(() => {
+            const usedLiveGameIds = new Set<string>();
+
+            return sorted.map(game => {
+              const liveGame = liveGames.find(lg => {
+                if (usedLiveGameIds.has(lg.id)) return false;
+
+                const matched = findLiveGame(game, [lg]);
+
+                if (matched) {
+                  usedLiveGameIds.add(lg.id);
+                  return true;
+                }
+
+                return false;
+              }) ?? null;
+
+              return (
+                <GameCard
+                  key={game.gameId}
+                  game={game}
+                  liveGame={liveGame}
+                  hasBet={gameHasBet(game, betTokens)}
+                />
+              );
+            });
+          })()}
         </div>
       )}
     </div>
