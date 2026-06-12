@@ -420,6 +420,8 @@ export function BetHistory() {
         isFinal: g.isFinal ?? g.status === "Final",
         periodLabel: g.periodLabel ?? (g.status === "Final" ? "Final" : null),
         statusText: g.statusText ?? g.status ?? "",
+        homeTeamCode: g.homeTeamCode ?? "",
+        awayTeamCode: g.awayTeamCode ?? "",
         homeRecord: g.homeRecord ?? null,
         awayRecord: g.awayRecord ?? null,
       })));
