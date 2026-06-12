@@ -93,7 +93,8 @@ export class BetsService {
     });
 
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayPacific = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+    const todayStart = new Date(todayPacific + "T00:00:00.000Z");
     const weekStart = new Date(todayStart);
     weekStart.setDate(todayStart.getDate() - todayStart.getDay());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
