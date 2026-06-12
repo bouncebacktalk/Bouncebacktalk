@@ -69,7 +69,7 @@ const TEAM_ALIASES: Record<string, string[]> = {
   // MLB
   nyy: ['yankees', 'new york yankees'],  nym: ['mets', 'new york mets'],
   bos: ['red sox', 'boston'],            lad: ['dodgers', 'los angeles dodgers'],
-  sfg: ['giants', 'san francisco'],      chc: ['cubs', 'chicago cubs'],
+  sf: ['giants', 'san francisco'],       sfg: ['giants', 'san francisco'],      chc: ['cubs', 'chicago cubs'],
   cws: ['white sox', 'chicago white'],   hou: ['astros', 'houston'],
   atl: ['braves', 'atlanta'],            phi: ['phillies', 'philadelphia'],
   mia: ['marlins', 'miami'],             wsh: ['nationals', 'washington'],
@@ -84,6 +84,7 @@ const TEAM_ALIASES: Record<string, string[]> = {
   sd:  ['padres', 'san diego'],          tb: ['rays', 'tampa bay'],
   bal: ['orioles', 'baltimore'],         tor: ['blue jays', 'toronto'],
   // NBA (ready for when NBA provider is added)
+  wsh_nba: ['wizards', 'washington wizards'],
   gsw: ['warriors', 'golden state'],     okc: ['thunder', 'oklahoma'],
   lal: ['lakers', 'los angeles lakers'], lac: ['clippers'],
   bkn: ['nets', 'brooklyn'],             nyk: ['knicks', 'new york knicks'],
@@ -122,7 +123,29 @@ function teamMatches(query: string, fullName: string, code: string): boolean {
 export function matchLegToGame(leg: BetLeg, games: LiveGame[]): LiveGame | null {
   if (!games.length) return null;
 
-  const sport = leg.sport?.toUpperCase();
+  // Split game string BEFORE normalizing so "SAS vs NYK" → ["SAS", "NYK"]
+  const rawGame = (leg.game ?? '').trim();
+  const gameTokens = rawGame.length >= 2
+    ? rawGame.split(/\s+(?:vs\.?|@|at)\s+/i).map((t) => t.trim()).filter(Boolean)
+    : [];
+
+  const explicitSport = leg.sport?.toUpperCase();
+
+  // If OCR did not store sport, infer it from the actual teams in available games.
+  const sport = explicitSport || (() => {
+    if (gameTokens.length < 2) return null;
+
+    const matchesBySport = games.filter((g) => {
+      const t1Home = teamMatches(gameTokens[0], g.homeTeam, g.homeTeamCode);
+      const t1Away = teamMatches(gameTokens[0], g.awayTeam, g.awayTeamCode);
+      const t2Home = teamMatches(gameTokens[1], g.homeTeam, g.homeTeamCode);
+      const t2Away = teamMatches(gameTokens[1], g.awayTeam, g.awayTeamCode);
+      return (t1Home && t2Away) || (t1Away && t2Home);
+    }).map((g) => g.sport?.toUpperCase());
+
+    const unique = [...new Set(matchesBySport)];
+    return unique.length === 1 ? unique[0] : null;
+  })();
 
   // Match live AND final games (finals give us definitive green/red)
   const pool = games.filter((g) =>
@@ -130,12 +153,6 @@ export function matchLegToGame(leg: BetLeg, games: LiveGame[]): LiveGame | null 
     (sport ? g.sport?.toUpperCase() === sport : true)
   );
   if (!pool.length) return null;
-
-  // Split game string BEFORE normalizing so "SAS vs NYK" → ["SAS", "NYK"]
-  const rawGame = (leg.game ?? '').trim();
-  const gameTokens = rawGame.length >= 2
-    ? rawGame.split(/\s+(?:vs\.?|@|at)\s+/i).map((t) => t.trim()).filter(Boolean)
-    : [];
 
   // Strip the line number from pick: "SAS +2.5" → "SAS", "Over 8.5" → "Over 8.5"
   const pickTeam = (leg.pick ?? '').replace(/\s*[+\-]\d+(\.\d+)?$/, '').trim();
