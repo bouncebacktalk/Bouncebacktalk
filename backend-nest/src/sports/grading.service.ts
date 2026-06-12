@@ -238,7 +238,7 @@ export class GradingService {
     }
 
     // Spread
-    if (betType.includes('spread')) {
+    if (betType.includes('spread') || betType.includes('run line') || betType.includes('runline')) {
       const lineMatch = (leg.line ?? leg.pick ?? '').match(/([+-]?\d+\.?\d*)/);
       if (lineMatch) {
         const spread = parseFloat(lineMatch[1]);
