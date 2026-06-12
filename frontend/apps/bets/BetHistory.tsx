@@ -206,13 +206,13 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
             {bet.legs.length > 0 && (
               <div className="space-y-2">
                 {bet.legs.map((leg, i) => {
-                  const game = !leg.result ? matchLegToGame(leg, liveGames) : null;
+                  const game = isPending && !leg.result ? matchLegToGame(leg, liveGames) : null;
                   const result = game ? computeLegResult(leg, game) : null;
-                  const isLive = game?.isLive ?? false;
+                  const isLive = isPending && (game?.isLive ?? false);
                   const comingSoon = COMING_SOON_SPORTS.has((leg.sport ?? "").toUpperCase());
 
                   // ── Progress bar: math-based ─────────────────────────
-                  const settled = !!leg.result;
+                  const settled = !!leg.result || !isPending;
 
                   // Parse pick text — handle OCR variants: "Over 14.5" / "o 14.5" / "O14.5"
                   const pickText = (leg.pick ?? "").toLowerCase();
@@ -252,7 +252,9 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
                   // Color: mathematically green/red/grey while live, definitive when settled
                   const barColor = settled
-                    ? leg.result === "WON"  ? "bg-[#30D158]"
+                    ? bet.status === "WON"  ? "bg-[#30D158]"
+                    : bet.status === "LOST" ? "bg-[#E21111]"
+                    : leg.result === "WON"  ? "bg-[#30D158]"
                     : leg.result === "LOST" ? "bg-[#E21111]"
                     : "bg-[#636366]"                         // PUSH or VOID → grey
                     : isLive
