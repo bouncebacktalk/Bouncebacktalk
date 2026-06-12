@@ -254,6 +254,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
                   const barColor = settled
                     ? leg.result === "WON"  ? "bg-[#30D158]"
                     : leg.result === "LOST" ? "bg-[#E21111]"
+                    : leg.result === "PUSH" ? "bg-[#5AC8FA]"
                     : bet.status === "WON"  ? "bg-[#30D158]"
                     : bet.status === "LOST" ? "bg-[#E21111]"
                     : "bg-[#636366]"
@@ -285,6 +286,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
                           <span className={`text-[9px] font-black uppercase tracking-wider shrink-0 ${
                             leg.result === "WON"  ? "text-[#30D158]"
                             : leg.result === "LOST" ? "text-[#E21111]"
+                            : leg.result === "PUSH" ? "text-[#5AC8FA]"
                             : "text-[#636366]"
                           }`}>
                             {leg.result}
