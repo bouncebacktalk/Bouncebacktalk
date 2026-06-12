@@ -169,7 +169,13 @@ function OcrPreview({ result, onConfirm, onDiscard }: {
       stake: Number(stake), odds: Number(odds), payout: Number(payout),
       status, betDate,
       legs: result.legs?.map((l) => ({
-        pick: l.pick, odds: l.odds, betType: l.betType, game: l.game, result: l.result,
+        pick: l.pick,
+        odds: l.odds,
+        betType: l.betType,
+        game: l.game,
+        sport: l.sport,
+        league: l.league,
+        line: l.line,
       })),
     });
   }
