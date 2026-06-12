@@ -403,7 +403,15 @@ export class SportsDataService {
   async getScoresByDate(sport: string, date?: string): Promise<GameScore[]> {
     const upper = sport.toUpperCase() as 'NBA' | 'MLB';
     if (!SUPPORTED_SPORTS.has(upper)) return [];
-    const games = await this.getLiveGamesBySport(upper, date);
+
+    let games = await this.getLiveGamesBySport(upper, date);
+
+    // Fallback: SportsData historical endpoints can return empty.
+    // MLB Stats API is more reliable for yesterday/final settlement.
+    if (games.length === 0 && upper === 'MLB') {
+      games = await this.fetchMLBFromStatsApi(date ?? today());
+    }
+
     return games.map((g) => ({
       gameId: g.gameId,
       sport: g.sport,
@@ -416,6 +424,38 @@ export class SportsDataService {
       timeRemaining: g.timeRemaining,
       gameTime: g.gameTime,
     }));
+  }
+
+
+  private async fetchMLBFromStatsApi(date: string): Promise<LiveGame[]> {
+    const url = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}&hydrate=linescore`;
+    const raw = await this.fetchJson<any>(url);
+    const games: any[] = raw?.dates?.[0]?.games ?? [];
+
+    return games.map((g) => {
+      const statusText = g.status?.abstractGameState ?? g.status?.detailedState ?? 'Scheduled';
+      const status = statusText === 'Final' || g.status?.codedGameState === 'F' ? 'Final'
+        : statusText === 'Live' || g.status?.codedGameState === 'I' ? 'InProgress'
+        : 'Scheduled';
+
+      return {
+        gameId: String(g.gamePk ?? ''),
+        sport: 'MLB',
+        homeTeam: g.teams?.home?.team?.name ?? '',
+        awayTeam: g.teams?.away?.team?.name ?? '',
+        homeTeamCode: g.teams?.home?.team?.abbreviation ?? '',
+        awayTeamCode: g.teams?.away?.team?.abbreviation ?? '',
+        homeScore: g.teams?.home?.score ?? null,
+        awayScore: g.teams?.away?.score ?? null,
+        status,
+        isLive: status === 'InProgress',
+        isFinal: status === 'Final',
+        period: null,
+        periodLabel: status,
+        timeRemaining: null,
+        gameTime: g.gameDate ?? '',
+      } as LiveGame;
+    });
   }
 
   async getGameScore(sport: string, gameId: string): Promise<GameScore | null> {
