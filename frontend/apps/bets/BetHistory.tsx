@@ -304,7 +304,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
                         />
                       </div>
 
-                      {/* Live score + game time */}
+                      {/* Final/live score tag */}
                       {game && (
                         <div className="mt-1.5 pl-4">
                           <ScoreBadge game={game} result={result} />
