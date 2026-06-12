@@ -420,8 +420,8 @@ export function BetHistory() {
         isFinal: g.isFinal ?? g.status === "Final",
         periodLabel: g.periodLabel ?? (g.status === "Final" ? "Final" : null),
         statusText: g.statusText ?? g.status ?? "",
-        homeTeamCode: g.homeTeamCode ?? "",
-        awayTeamCode: g.awayTeamCode ?? "",
+        homeTeamCode: g.homeTeamCode ?? (g.homeTeam === "New York Knicks" ? "NYK" : g.homeTeam === "San Antonio Spurs" ? "SAS" : ""),
+        awayTeamCode: g.awayTeamCode ?? (g.awayTeam === "New York Knicks" ? "NYK" : g.awayTeam === "San Antonio Spurs" ? "SAS" : ""),
         homeRecord: g.homeRecord ?? null,
         awayRecord: g.awayRecord ?? null,
       })));
