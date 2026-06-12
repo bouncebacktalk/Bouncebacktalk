@@ -330,7 +330,10 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
               <button
                 disabled={deleting}
-                onClick={deleteBet}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteBet();
+                }}
                 className="flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold rounded-xl py-2.5 px-4 active:scale-95 transition-transform disabled:opacity-50"
               >
                 <Trash2 className="size-4" />
