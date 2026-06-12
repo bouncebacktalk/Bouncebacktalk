@@ -81,7 +81,7 @@ export class GradingService {
   ) {}
 
   /** Runs automatically every 5 minutes */
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   async autoCronGrade() {
     this.logger.log('Auto-grading: checking pending bets...');
     const result = await this.gradePendingBets();
@@ -179,7 +179,13 @@ export class GradingService {
         }
 
         const game = this.findGameForLeg(leg, betDate, scoresBySportDate);
-        if (!game || game.status !== 'Final') return { id: leg.id, result: null };
+        if (!game) return { id: leg.id, result: null };
+
+        if (game.status === 'Postponed' || game.status === 'Cancelled' || game.status === 'Canceled' || game.homeScore == null || game.awayScore == null) {
+          return { id: leg.id, result: 'PUSH' as BetStatus };
+        }
+
+        if (game.status !== 'Final') return { id: leg.id, result: null };
 
         return { id: leg.id, result: this.gradeStraitLeg(leg, game) };
       });
