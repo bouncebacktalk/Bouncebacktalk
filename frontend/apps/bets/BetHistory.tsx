@@ -408,8 +408,8 @@ export function BetHistory() {
 
     Promise.all(
       dates.flatMap((date) => [
-        apiGet<LiveGame[]>(`/api/sports/scores?sport=MLB&date=${date}`).catch(() => []),
-        apiGet<LiveGame[]>(`/api/sports/scores?sport=NBA&date=${date}`).catch(() => []),
+        apiGet<LiveGame[]>(`/api/sports/scores?sport=MLB&date=${date}`).then((games) => games.map((g: any) => ({ ...g, sourceBetDate: date }))).catch(() => []),
+        apiGet<LiveGame[]>(`/api/sports/scores?sport=NBA&date=${date}`).then((games) => games.map((g: any) => ({ ...g, sourceBetDate: date }))).catch(() => []),
       ])
     ).then((chunks) => {
       setHistoricalGames(chunks.flat().map((g: any) => ({
@@ -527,7 +527,15 @@ export function BetHistory() {
       ) : (
         <div className="space-y-3">
           {bets.map((bet) => (
-            <BetCard key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveGames={allGames} />
+            <BetCard
+              key={bet.id}
+              bet={bet}
+              onRefresh={() => fetchBets(true)}
+              liveGames={[
+                ...historicalGames.filter((g: any) => g.sourceBetDate === new Date(bet.betDate).toISOString().slice(0, 10)),
+                ...allGames,
+              ]}
+            />
           ))}
           {hasMore && (
             <button
