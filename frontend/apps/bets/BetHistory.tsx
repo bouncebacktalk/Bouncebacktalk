@@ -252,11 +252,11 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
                   // Color: mathematically green/red/grey while live, definitive when settled
                   const barColor = settled
-                    ? bet.status === "WON"  ? "bg-[#30D158]"
-                    : bet.status === "LOST" ? "bg-[#E21111]"
-                    : leg.result === "WON"  ? "bg-[#30D158]"
+                    ? leg.result === "WON"  ? "bg-[#30D158]"
                     : leg.result === "LOST" ? "bg-[#E21111]"
-                    : bet.status === "LOST" ? "bg-[#E21111]" : "bg-[#636366]" // lost parlay fallback red
+                    : bet.status === "WON"  ? "bg-[#30D158]"
+                    : bet.status === "LOST" ? "bg-[#E21111]"
+                    : "bg-[#636366]"
                     : isLive
                     ? result === "winning" ? "bg-[#30D158]"  // currently hitting → green
                     : result === "losing"  ? "bg-[#E21111]"  // currently missing → red
