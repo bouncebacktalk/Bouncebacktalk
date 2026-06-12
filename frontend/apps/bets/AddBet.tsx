@@ -1,3 +1,8 @@
+
+function todayPacificDate() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+}
+
 import { useState, useRef, useEffect } from "react";
 import {
   Camera, Upload, Loader2, CheckCircle, X, Plus, Trash2,
@@ -160,7 +165,7 @@ function OcrPreview({ result, onConfirm, onDiscard }: {
   const [odds, setOdds] = useState(String(result.odds ?? ""));
   const [payout, setPayout] = useState(String(result.payout ?? ""));
   const [status, setStatus] = useState<BetStatus>(result.status ?? "PENDING");
-  const [betDate, setBetDate] = useState(result.betDate ?? new Date().toISOString().slice(0, 10));
+  const [betDate, setBetDate] = useState(result.betDate ?? todayPacificDate());
 
   function confirm() {
     onConfirm({
