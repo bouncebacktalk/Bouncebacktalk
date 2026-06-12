@@ -102,6 +102,9 @@ function teamsMatch(a: string, b: string) {
 }
 
 function findLiveGame(game: GameOdds, liveGames: LiveGame[]): LiveGame | null {
+  const exact = liveGames.find(lg => String(lg.id) === String(game.gameId));
+  if (exact) return exact;
+
   for (const lg of liveGames) {
     const sameOrder =
       teamsMatch(game.homeTeam, lg.homeTeam) &&
