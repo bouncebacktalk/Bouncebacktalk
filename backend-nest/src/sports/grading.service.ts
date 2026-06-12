@@ -131,7 +131,14 @@ export class GradingService {
             legs: {
               update: gradedBet.legs.map((leg: any) => ({
                 where: { id: leg.id },
-                data: { result: leg.result },
+                data: {
+                  result: leg.result,
+                  matchedHomeTeam: leg.matchedHomeTeam ?? null,
+                  matchedAwayTeam: leg.matchedAwayTeam ?? null,
+                  matchedHomeScore: leg.matchedHomeScore ?? null,
+                  matchedAwayScore: leg.matchedAwayScore ?? null,
+                  matchedStatus: leg.matchedStatus ?? null,
+                },
               })),
             },
           },
@@ -181,7 +188,15 @@ export class GradingService {
         const game = this.findGameForLeg(leg, betDate, scoresBySportDate);
         if (!game || game.status !== 'Final') return { id: leg.id, result: null };
 
-        return { id: leg.id, result: this.gradeStraitLeg(leg, game) };
+        return {
+          id: leg.id,
+          result: this.gradeStraitLeg(leg, game),
+          matchedHomeTeam: game.homeTeam ?? null,
+          matchedAwayTeam: game.awayTeam ?? null,
+          matchedHomeScore: game.homeScore ?? null,
+          matchedAwayScore: game.awayScore ?? null,
+          matchedStatus: game.status ?? null,
+        };
       });
 
       const legResults: (BetStatus | null)[] = gradedLegs.map((leg: any) => leg.result);
