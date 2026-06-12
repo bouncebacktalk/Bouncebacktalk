@@ -125,12 +125,6 @@ model BetLeg {
   odds     Int?
   result   BetStatus?
 
-  matchedHomeTeam  String?
-  matchedAwayTeam  String?
-  matchedHomeScore Int?
-  matchedAwayScore Int?
-  matchedStatus    String?
-
   @@map("bet_legs")
 }
 
