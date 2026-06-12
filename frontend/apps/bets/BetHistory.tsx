@@ -330,7 +330,12 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
 
               <button
                 disabled={deleting}
-                onPointerDown={(e) => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  deleteBet();
+                }}
+                onTouchEnd={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   deleteBet();
