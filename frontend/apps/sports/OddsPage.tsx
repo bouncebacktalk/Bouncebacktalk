@@ -147,9 +147,9 @@ function liveGameToGameOdds(game: LiveGame): GameOdds {
 }
 
 function uniqueGames(games: GameOdds[]): GameOdds[] {
-  const byMatchup = new Map<string, GameOdds>();
+  const seen = new Set<string>();
 
-  for (const game of games) {
+  return games.filter((game) => {
     const day = game.gameTime
       ? new Date(game.gameTime).toLocaleDateString("en-CA")
       : "";
@@ -164,27 +164,10 @@ function uniqueGames(games: GameOdds[]): GameOdds[] {
       day,
     ].join(":");
 
-    const existing = byMatchup.get(key);
-
-    if (!existing) {
-      byMatchup.set(key, game);
-      continue;
-    }
-
-    const gameIsLive = game.status === "InProgress";
-    const existingIsLive = existing.status === "InProgress";
-    const gameIsFinal = game.status === "Final";
-    const existingIsFinal = existing.status === "Final";
-
-    if (gameIsLive && !existingIsLive) {
-      byMatchup.set(key, game);
-    } else if (!existingIsFinal && gameIsFinal) {
-      // Keep the existing non-final game over a final duplicate.
-      continue;
-    }
-  }
-
-  return Array.from(byMatchup.values());
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function isTodayGame(gameTime: string): boolean {
