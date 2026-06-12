@@ -366,6 +366,7 @@ function SkeletonCard() {
 
 export function BetHistory() {
   const liveGames = useLiveScores();
+  const [historicalGames, setHistoricalGames] = useState<LiveGame[]>([]);
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -401,6 +402,21 @@ export function BetHistory() {
     return () => clearTimeout(t);
   }, [search]);
   useEffect(() => { if (page > 1) fetchBets(false); }, [page]);
+
+  useEffect(() => {
+    const dates = [...new Set(bets.map((b) => new Date(b.betDate).toISOString().slice(0, 10)))];
+
+    Promise.all(
+      dates.flatMap((date) => [
+        apiGet<LiveGame[]>(`/api/sports/scores?sport=MLB&date=${date}`).catch(() => []),
+        apiGet<LiveGame[]>(`/api/sports/scores?sport=NBA&date=${date}`).catch(() => []),
+      ])
+    ).then((chunks) => {
+      setHistoricalGames(chunks.flat());
+    });
+  }, [bets]);
+
+  const allGames = [...liveGames, ...historicalGames];
 
   const pendingCount = bets.filter((b) => b.status === "PENDING").length;
 
@@ -499,7 +515,7 @@ export function BetHistory() {
       ) : (
         <div className="space-y-3">
           {bets.map((bet) => (
-            <BetCard key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveGames={liveGames} />
+            <BetCard key={bet.id} bet={bet} onRefresh={() => fetchBets(true)} liveGames={allGames} />
           ))}
           {hasMore && (
             <button
