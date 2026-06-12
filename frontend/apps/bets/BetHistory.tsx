@@ -412,7 +412,17 @@ export function BetHistory() {
         apiGet<LiveGame[]>(`/api/sports/scores?sport=NBA&date=${date}`).catch(() => []),
       ])
     ).then((chunks) => {
-      setHistoricalGames(chunks.flat());
+      setHistoricalGames(chunks.flat().map((g: any) => ({
+        ...g,
+        id: String(g.id ?? g.gameId ?? ""),
+        state: g.state ?? (g.status === "Final" ? "final" : g.status === "InProgress" ? "live" : "scheduled"),
+        isLive: g.isLive ?? g.status === "InProgress",
+        isFinal: g.isFinal ?? g.status === "Final",
+        periodLabel: g.periodLabel ?? (g.status === "Final" ? "Final" : null),
+        statusText: g.statusText ?? g.status ?? "",
+        homeRecord: g.homeRecord ?? null,
+        awayRecord: g.awayRecord ?? null,
+      })));
     });
   }, [bets]);
 
