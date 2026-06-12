@@ -127,10 +127,11 @@ function liveGameToGameOdds(game: LiveGame): GameOdds {
 function uniqueGames(games: GameOdds[]): GameOdds[] {
   const seen = new Set<string>();
   return games.filter((game) => {
+    const gameId = game.gameId ? `${game.sport}:${game.gameId}` : "";
     const day = game.gameTime
       ? new Date(game.gameTime).toLocaleDateString("en-CA")
       : "";
-    const key = [
+    const key = gameId || [
       game.sport?.toUpperCase(),
       normTeam(game.awayTeam),
       normTeam(game.homeTeam),
@@ -141,6 +142,12 @@ function uniqueGames(games: GameOdds[]): GameOdds[] {
     seen.add(key);
     return true;
   });
+}
+
+function isTodayGame(gameTime: string): boolean {
+  if (!gameTime) return false;
+  return new Date(gameTime).toLocaleDateString("en-CA") ===
+    new Date().toLocaleDateString("en-CA");
 }
 
 // ── Logo with fallback initials ───────────────────────────────────────────────
@@ -442,6 +449,7 @@ export function OddsPage() {
     ? []
     : liveGames
       .filter((game) => game.sport?.toUpperCase() === sport)
+      .filter((game) => isTodayGame(game.gameTime))
       .map(liveGameToGameOdds);
 
   const displayGames = uniqueGames(games.length > 0 ? games : fallbackGames);
