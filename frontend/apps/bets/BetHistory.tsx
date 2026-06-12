@@ -256,7 +256,7 @@ function BetCard({ bet, onRefresh, liveGames }: { bet: Bet; onRefresh: () => voi
                     : bet.status === "LOST" ? "bg-[#E21111]"
                     : leg.result === "WON"  ? "bg-[#30D158]"
                     : leg.result === "LOST" ? "bg-[#E21111]"
-                    : "bg-[#636366]"                         // PUSH or VOID → grey
+                    : bet.status === "LOST" ? "bg-[#E21111]" : "bg-[#636366]" // lost parlay fallback red
                     : isLive
                     ? result === "winning" ? "bg-[#30D158]"  // currently hitting → green
                     : result === "losing"  ? "bg-[#E21111]"  // currently missing → red
