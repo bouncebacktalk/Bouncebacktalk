@@ -4,6 +4,73 @@ import { PrismaService } from '../prisma';
 import { SportsDataService } from './sports-data.service';
 import { BetStatus } from '@prisma/client';
 
+const TEAM_ALIASES: Record<string, { sport: string; names: string[] }> = {
+  // MLB
+  ari: { sport: 'MLB', names: ['arizona', 'diamondbacks', 'dbacks'] },
+  atl: { sport: 'MLB', names: ['atlanta', 'braves', 'hawks'] },
+  bal: { sport: 'MLB', names: ['baltimore', 'orioles'] },
+  bos: { sport: 'MLB', names: ['boston', 'red sox', 'celtics'] },
+  chc: { sport: 'MLB', names: ['chicago cubs', 'cubs'] },
+  cws: { sport: 'MLB', names: ['chicago white sox', 'white sox'] },
+  cin: { sport: 'MLB', names: ['cincinnati', 'reds'] },
+  cle: { sport: 'MLB', names: ['cleveland', 'guardians', 'cavaliers', 'cavs'] },
+  col: { sport: 'MLB', names: ['colorado', 'rockies'] },
+  det: { sport: 'MLB', names: ['detroit', 'tigers', 'pistons'] },
+  hou: { sport: 'MLB', names: ['houston', 'astros', 'rockets'] },
+  kc: { sport: 'MLB', names: ['kansas city', 'royals'] },
+  laa: { sport: 'MLB', names: ['los angeles angels', 'angels'] },
+  lad: { sport: 'MLB', names: ['los angeles dodgers', 'dodgers'] },
+  mia: { sport: 'MLB', names: ['miami', 'marlins', 'heat'] },
+  mil: { sport: 'MLB', names: ['milwaukee', 'brewers', 'bucks'] },
+  min: { sport: 'MLB', names: ['minnesota', 'twins', 'timberwolves', 'wolves'] },
+  nym: { sport: 'MLB', names: ['new york mets', 'mets'] },
+  nyy: { sport: 'MLB', names: ['new york yankees', 'yankees'] },
+  oak: { sport: 'MLB', names: ['oakland', 'athletics'] },
+  phi: { sport: 'MLB', names: ['philadelphia', 'phillies', '76ers', 'sixers'] },
+  pit: { sport: 'MLB', names: ['pittsburgh', 'pirates'] },
+  sd: { sport: 'MLB', names: ['san diego', 'padres'] },
+  sea: { sport: 'MLB', names: ['seattle', 'mariners'] },
+  sf: { sport: 'MLB', names: ['san francisco', 'giants'] },
+  sfg: { sport: 'MLB', names: ['san francisco', 'giants'] },
+  stl: { sport: 'MLB', names: ['st louis', 'saint louis', 'cardinals'] },
+  tb: { sport: 'MLB', names: ['tampa bay', 'rays'] },
+  tex: { sport: 'MLB', names: ['texas', 'rangers'] },
+  tor: { sport: 'MLB', names: ['toronto', 'blue jays', 'raptors'] },
+  wsh: { sport: 'MLB', names: ['washington', 'nationals', 'wizards'] },
+
+  // NBA
+  atl_hawks: { sport: 'NBA', names: ['atlanta hawks', 'hawks'] },
+  bkn: { sport: 'NBA', names: ['brooklyn', 'nets'] },
+  bos_celtics: { sport: 'NBA', names: ['boston celtics', 'celtics'] },
+  cha: { sport: 'NBA', names: ['charlotte', 'hornets'] },
+  chi: { sport: 'NBA', names: ['chicago bulls', 'bulls'] },
+  cle_cavs: { sport: 'NBA', names: ['cleveland cavaliers', 'cavaliers', 'cavs'] },
+  dal: { sport: 'NBA', names: ['dallas', 'mavericks', 'mavs'] },
+  den: { sport: 'NBA', names: ['denver', 'nuggets'] },
+  det_pistons: { sport: 'NBA', names: ['detroit pistons', 'pistons'] },
+  gsw: { sport: 'NBA', names: ['golden state', 'warriors'] },
+  hou_rockets: { sport: 'NBA', names: ['houston rockets', 'rockets'] },
+  ind: { sport: 'NBA', names: ['indiana', 'pacers'] },
+  lac: { sport: 'NBA', names: ['los angeles clippers', 'clippers'] },
+  lal: { sport: 'NBA', names: ['los angeles lakers', 'lakers'] },
+  mem: { sport: 'NBA', names: ['memphis', 'grizzlies'] },
+  mia_heat: { sport: 'NBA', names: ['miami heat', 'heat'] },
+  mil_bucks: { sport: 'NBA', names: ['milwaukee bucks', 'bucks'] },
+  min_wolves: { sport: 'NBA', names: ['minnesota timberwolves', 'timberwolves', 'wolves'] },
+  nop: { sport: 'NBA', names: ['new orleans', 'pelicans'] },
+  nyk: { sport: 'NBA', names: ['new york knicks', 'knicks'] },
+  okc: { sport: 'NBA', names: ['oklahoma city', 'thunder'] },
+  orl: { sport: 'NBA', names: ['orlando', 'magic'] },
+  phi_sixers: { sport: 'NBA', names: ['philadelphia 76ers', '76ers', 'sixers'] },
+  phx: { sport: 'NBA', names: ['phoenix', 'suns'] },
+  por: { sport: 'NBA', names: ['portland', 'trail blazers', 'blazers'] },
+  sac: { sport: 'NBA', names: ['sacramento', 'kings'] },
+  sas: { sport: 'NBA', names: ['san antonio', 'spurs'] },
+  tor_raptors: { sport: 'NBA', names: ['toronto raptors', 'raptors'] },
+  uta: { sport: 'NBA', names: ['utah', 'jazz'] },
+  was: { sport: 'NBA', names: ['washington wizards', 'wizards'] },
+};
+
 @Injectable()
 export class GradingService {
   private readonly logger = new Logger(GradingService.name);
@@ -32,7 +99,7 @@ export class GradingService {
 
     // Fetch scores for the dates represented by pending bets. This keeps
     // yesterday's games available for settlement without showing them on Scores.
-    const sports = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAF', 'NCAAB'];
+    const sports = this.supportedSports();
     const scoreDates = [...new Set(pendingBets.map((bet) => this.dateKey(bet.betDate)))];
     const scoresBySportDate: Record<string, any[]> = {};
     await Promise.all(
@@ -90,11 +157,7 @@ export class GradingService {
     // For straight bets with a single leg, try to match to a game result
     if (bet.type === 'STRAIGHT' && bet.legs?.length === 1) {
       const leg = bet.legs[0];
-      const sport = this.detectSport(leg.sport, leg.game, leg.pick);
-      if (!sport) return null;
-
-      const scores = scoresBySportDate[this.scoreKey(sport, betDate)] ?? [];
-      const game = this.matchGame(leg.game, leg.pick, scores);
+      const game = this.findGameForLeg(leg, betDate, scoresBySportDate);
       if (!game || game.status !== 'Final') return null;
 
       return this.gradeStraitLeg(leg, game);
@@ -106,10 +169,7 @@ export class GradingService {
         // If leg already has a stored result, use it directly
         if (leg.result === 'WON' || leg.result === 'LOST' || leg.result === 'PUSH') return leg.result as BetStatus;
         // Otherwise try to match against live/final scores
-        const sport = this.detectSport(leg.sport, leg.game, leg.pick);
-        if (!sport) return null;
-        const scores = scoresBySportDate[this.scoreKey(sport, betDate)] ?? [];
-        const game = this.matchGame(leg.game, leg.pick, scores);
+        const game = this.findGameForLeg(leg, betDate, scoresBySportDate);
         if (!game || game.status !== 'Final') return null;
         return this.gradeStraitLeg(leg, game);
       });
@@ -124,19 +184,39 @@ export class GradingService {
     return null;
   }
 
+  private findGameForLeg(leg: any, betDate: string, scoresBySportDate: Record<string, any[]>): any | null {
+    const detectedSport = this.detectSport(leg.sport, leg.game, leg.pick);
+    if (detectedSport && !this.supportedSports().includes(detectedSport)) return null;
+
+    const sportsToTry = detectedSport
+      ? [detectedSport, ...this.supportedSports().filter((sport) => sport !== detectedSport)]
+      : this.supportedSports();
+
+    for (const sport of sportsToTry) {
+      const scores = scoresBySportDate[this.scoreKey(sport, betDate)] ?? [];
+      const game = this.matchGame(leg.game, leg.pick, scores);
+      if (game) return game;
+    }
+
+    return null;
+  }
+
+  private supportedSports(): string[] {
+    return ['NBA', 'MLB'];
+  }
+
   private gradeStraitLeg(leg: any, game: any): BetStatus | null {
     const betType = (leg.betType ?? '').toLowerCase();
     const homeScore = game.homeScore ?? 0;
     const awayScore = game.awayScore ?? 0;
     const total = homeScore + awayScore;
     const pick = (leg.pick ?? '').toLowerCase();
-    const home = (game.homeTeam ?? '').toLowerCase();
-    const away = (game.awayTeam ?? '').toLowerCase();
+    const pickedSide = this.pickedSide(leg, game);
 
     // Moneyline
     if (betType.includes('moneyline') || betType === 'ml') {
-      if (pick.includes(home)) return homeScore > awayScore ? 'WON' : homeScore === awayScore ? 'PUSH' : 'LOST';
-      if (pick.includes(away)) return awayScore > homeScore ? 'WON' : homeScore === awayScore ? 'PUSH' : 'LOST';
+      if (pickedSide === 'home') return homeScore > awayScore ? 'WON' : homeScore === awayScore ? 'PUSH' : 'LOST';
+      if (pickedSide === 'away') return awayScore > homeScore ? 'WON' : homeScore === awayScore ? 'PUSH' : 'LOST';
     }
 
     // Spread
@@ -144,13 +224,13 @@ export class GradingService {
       const lineMatch = (leg.line ?? leg.pick ?? '').match(/([+-]?\d+\.?\d*)/);
       if (lineMatch) {
         const spread = parseFloat(lineMatch[1]);
-        if (pick.includes(home)) {
+        if (pickedSide === 'home') {
           const covered = homeScore + spread - awayScore;
           if (covered > 0) return 'WON';
           if (covered < 0) return 'LOST';
           return 'PUSH';
         }
-        if (pick.includes(away)) {
+        if (pickedSide === 'away') {
           const covered = awayScore + spread - homeScore;
           if (covered > 0) return 'WON';
           if (covered < 0) return 'LOST';
@@ -189,11 +269,38 @@ export class GradingService {
     if (text.includes('ncaaf') || text.includes('college football')) return 'NCAAF';
     if (text.includes('ncaab') || text.includes('college basketball')) return 'NCAAB';
     if (sport) return sport.toUpperCase();
+    const tokens = this.teamTokens(game, pick);
+    const sports = new Set(tokens.map((token) => TEAM_ALIASES[this.norm(token)]?.sport).filter(Boolean));
+    if (sports.size === 1) return [...sports][0] as string;
     return null;
   }
 
   private matchGame(game: string | null, pick: string | null, scores: any[]): any | null {
     if (!scores.length) return null;
+    const gameTokens = this.gameTokens(game);
+    const pickTeam = this.pickTeam(pick);
+
+    if (gameTokens.length >= 2) {
+      const matched = scores.find((score) => this.matchesBothTeams(gameTokens[0], gameTokens[1], score));
+      if (matched) return matched;
+    }
+
+    if (gameTokens.length === 1) {
+      const matched = scores.find((score) =>
+        this.teamMatches(gameTokens[0], score.homeTeam, score.homeTeamCode) ||
+        this.teamMatches(gameTokens[0], score.awayTeam, score.awayTeamCode),
+      );
+      if (matched) return matched;
+    }
+
+    if (pickTeam) {
+      const matched = scores.find((score) =>
+        this.teamMatches(pickTeam, score.homeTeam, score.homeTeamCode) ||
+        this.teamMatches(pickTeam, score.awayTeam, score.awayTeamCode),
+      );
+      if (matched) return matched;
+    }
+
     const needle = `${game ?? ''} ${pick ?? ''}`.toLowerCase();
     return scores.find((s) => {
       const hay = `${s.homeTeam} ${s.awayTeam}`.toLowerCase();
@@ -205,6 +312,74 @@ export class GradingService {
         needle.includes(hay)
       );
     }) ?? null;
+  }
+
+  private matchesBothTeams(first: string, second: string, score: any): boolean {
+    const firstHome = this.teamMatches(first, score.homeTeam, score.homeTeamCode);
+    const firstAway = this.teamMatches(first, score.awayTeam, score.awayTeamCode);
+    const secondHome = this.teamMatches(second, score.homeTeam, score.homeTeamCode);
+    const secondAway = this.teamMatches(second, score.awayTeam, score.awayTeamCode);
+    return (firstHome && secondAway) || (firstAway && secondHome);
+  }
+
+  private pickedSide(leg: any, game: any): 'home' | 'away' | null {
+    const pickTeam = this.pickTeam(leg.pick);
+    if (!pickTeam) return null;
+    if (this.teamMatches(pickTeam, game.homeTeam, game.homeTeamCode)) return 'home';
+    if (this.teamMatches(pickTeam, game.awayTeam, game.awayTeamCode)) return 'away';
+    return null;
+  }
+
+  private teamMatches(query: string | null | undefined, fullName: string | null | undefined, code?: string | null): boolean {
+    const q = this.norm(query ?? '');
+    const full = this.norm(fullName ?? '');
+    const c = this.norm(code ?? '');
+    if (!q || !full) return false;
+
+    if (q === c || q === full) return true;
+    if (c && (q === c || c.startsWith(q) || q.startsWith(c))) return true;
+    if (full.includes(q) || q.includes(full)) return true;
+
+    const nickname = this.norm((fullName ?? '').split(/\s+/).pop() ?? '');
+    if (nickname.length > 2 && (q === nickname || q.includes(nickname) || nickname.includes(q))) return true;
+
+    const queryAlias = TEAM_ALIASES[q];
+    if (queryAlias?.names.some((name) => full.includes(this.norm(name)))) return true;
+
+    const codeAlias = TEAM_ALIASES[c];
+    if (codeAlias?.names.some((name) => full.includes(this.norm(name)))) return true;
+
+    return Object.values(TEAM_ALIASES).some(({ names }) => {
+      const queryHitsAlias = names.some((name) => q.includes(this.norm(name)));
+      const teamHitsAlias = names.some((name) => full.includes(this.norm(name)));
+      return queryHitsAlias && teamHitsAlias;
+    });
+  }
+
+  private gameTokens(game: string | null | undefined): string[] {
+    const text = (game ?? '').trim();
+    if (!text) return [];
+    return text.split(/\s+(?:vs\.?|@|at)\s+/i).map((part) => part.trim()).filter(Boolean);
+  }
+
+  private pickTeam(pick: string | null | undefined): string | null {
+    const text = (pick ?? '').trim();
+    if (!text || /\b(over|under)\b/i.test(text)) return null;
+    return text
+      .replace(/\b(ml|moneyline)\b/ig, '')
+      .replace(/\s*[+-]\d+(?:\.\d+)?\s*$/, '')
+      .trim() || null;
+  }
+
+  private teamTokens(game: string | null | undefined, pick: string | null | undefined): string[] {
+    const tokens = this.gameTokens(game);
+    const pickTeam = this.pickTeam(pick);
+    if (pickTeam) tokens.push(pickTeam);
+    return tokens;
+  }
+
+  private norm(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
   private dateKey(value: Date | string): string {
