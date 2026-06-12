@@ -30,14 +30,18 @@ export class GradingService {
 
     if (pendingBets.length === 0) return { graded: 0, skipped: 0, errors: 0 };
 
-    // Fetch today's scores for all sports
+    // Fetch scores for the dates represented by pending bets. This keeps
+    // yesterday's games available for settlement without showing them on Scores.
     const sports = ['NBA', 'NFL', 'MLB', 'NHL', 'NCAAF', 'NCAAB'];
-    const scoresBySport: Record<string, any[]> = {};
+    const scoreDates = [...new Set(pendingBets.map((bet) => this.dateKey(bet.betDate)))];
+    const scoresBySportDate: Record<string, any[]> = {};
     await Promise.all(
-      sports.map(async (sport) => {
-        const scores = await this.sportsData.getScoresByDate(sport);
-        if (scores.length > 0) scoresBySport[sport] = scores;
-      }),
+      sports.flatMap((sport) =>
+        scoreDates.map(async (date) => {
+          const scores = await this.sportsData.getScoresByDate(sport, date);
+          if (scores.length > 0) scoresBySportDate[this.scoreKey(sport, date)] = scores;
+        }),
+      ),
     );
 
     let graded = 0;
@@ -46,7 +50,7 @@ export class GradingService {
 
     for (const bet of pendingBets) {
       try {
-        const result = this.gradeBet(bet, scoresBySport);
+        const result = this.gradeBet(bet, scoresBySportDate);
         if (!result) { skipped++; continue; }
 
         const profit = this.calculateProfit(bet.stake, bet.payout, result);
@@ -80,14 +84,16 @@ export class GradingService {
     });
   }
 
-  private gradeBet(bet: any, scoresBySport: Record<string, any[]>): BetStatus | null {
+  private gradeBet(bet: any, scoresBySportDate: Record<string, any[]>): BetStatus | null {
+    const betDate = this.dateKey(bet.betDate);
+
     // For straight bets with a single leg, try to match to a game result
     if (bet.type === 'STRAIGHT' && bet.legs?.length === 1) {
       const leg = bet.legs[0];
       const sport = this.detectSport(leg.sport, leg.game, leg.pick);
       if (!sport) return null;
 
-      const scores = scoresBySport[sport] ?? [];
+      const scores = scoresBySportDate[this.scoreKey(sport, betDate)] ?? [];
       const game = this.matchGame(leg.game, leg.pick, scores);
       if (!game || game.status !== 'Final') return null;
 
@@ -102,7 +108,7 @@ export class GradingService {
         // Otherwise try to match against live/final scores
         const sport = this.detectSport(leg.sport, leg.game, leg.pick);
         if (!sport) return null;
-        const scores = scoresBySport[sport] ?? [];
+        const scores = scoresBySportDate[this.scoreKey(sport, betDate)] ?? [];
         const game = this.matchGame(leg.game, leg.pick, scores);
         if (!game || game.status !== 'Final') return null;
         return this.gradeStraitLeg(leg, game);
@@ -199,6 +205,14 @@ export class GradingService {
         needle.includes(hay)
       );
     }) ?? null;
+  }
+
+  private dateKey(value: Date | string): string {
+    return new Date(value).toISOString().slice(0, 10);
+  }
+
+  private scoreKey(sport: string, date: string): string {
+    return `${sport.toUpperCase()}:${date}`;
   }
 
   private calculateProfit(stake: any, payout: any, status: BetStatus): number {
